@@ -126,3 +126,101 @@ def test_company_admin_ticket_lifecycle(client):
     )
     assert reopen_res.status_code == 200
     assert reopen_res.json()["status"] == "Open"
+
+
+@pytest.mark.django_db
+def test_garment_iot_dynamic_fields_and_troubleshooting_checklist(client):
+    """
+    Test Garment IoT ticket creation with dynamic IoT sensor telemetry,
+    troubleshooting checklist, urgent priority, line & machine tracking, and filtering.
+    """
+    # 1. Create Garment IoT ticket with urgent priority & dynamic fields
+    payload = {
+        "title": "Needle Sensor Telemetry Drop on Juki Overlock Machine",
+        "affected_system": "Smart Sewing Machine Telemetry",
+        "category": "Sewing Machine IoT Telemetry / Needle Sensor Failure",
+        "priority": "Urgent",
+        "urgency": "High",
+        "production_impact": "Single Station Down",
+        "line_number": "Sewing Line 04",
+        "floor_location": "Floor 2 - Sewing Section A",
+        "machine_id": "JUKI-DLN-9010A-44",
+        "iot_details": {
+            "sensor_id": "SN-OP-9988",
+            "telemetry_protocol": "MQTT over TLS",
+            "error_code_display": "ERR-OPTICAL-LINT",
+            "rpm_speed": "4500 RPM"
+        },
+        "troubleshooting_checklist": [
+            "Cleaned optical lint collector with compressed air nozzle",
+            "Checked 24V DC auxiliary power supply voltage",
+            "Verified needle position sensor LED is illuminating green"
+        ],
+        "description": "Optical sensor is not sending stitch telemetry packets to MQTT broker since 10:15 AM.",
+        "company_name": "CSI Smart Tech Ltd",
+        "created_by_name": "Arafath",
+        "created_by_role": "company_admin"
+    }
+
+    create_res = client.post("/api/tickets/", data=payload, format="json")
+    assert create_res.status_code == 201
+    ticket = create_res.json()
+    ticket_id = ticket["id"]
+
+    assert ticket["priority"] == "Urgent"
+    assert ticket["production_impact"] == "Single Station Down"
+    assert ticket["line_number"] == "Sewing Line 04"
+    assert ticket["floor_location"] == "Floor 2 - Sewing Section A"
+    assert ticket["machine_id"] == "JUKI-DLN-9010A-44"
+    assert ticket["iot_details"]["sensor_id"] == "SN-OP-9988"
+    assert ticket["iot_details"]["error_code_display"] == "ERR-OPTICAL-LINT"
+    assert len(ticket["troubleshooting_checklist"]) == 3
+    assert "Cleaned optical lint collector" in ticket["troubleshooting_checklist"][0]
+
+    # 2. Retrieve ticket detail
+    get_res = client.get(f"/api/tickets/{ticket_id}/")
+    assert get_res.status_code == 200
+    detail = get_res.json()
+    assert detail["priority"] == "Urgent"
+    assert detail["machine_id"] == "JUKI-DLN-9010A-44"
+    assert detail["iot_details"]["rpm_speed"] == "4500 RPM"
+
+    # 3. Filter by priority=Urgent
+    filter_res = client.get("/api/tickets/?priority=Urgent")
+    assert filter_res.status_code == 200
+    tickets_list = filter_res.json()
+    assert any(t["id"] == ticket_id for t in tickets_list)
+
+    # 4. Search by machine_id
+    search_res = client.get("/api/tickets/?search=JUKI-DLN-9010A-44")
+    assert search_res.status_code == 200
+    search_list = search_res.json()
+    assert any(t["id"] == ticket_id for t in search_list)
+
+    # 5. Search by line_number
+    search_line_res = client.get("/api/tickets/?search=Sewing Line 04")
+    assert search_line_res.status_code == 200
+    assert any(t["id"] == ticket_id for t in search_line_res.json())
+
+    # 6. Company Admin updates IoT details & priority
+    patch_res = client.patch(
+        f"/api/tickets/{ticket_id}/",
+        data={
+            "priority": "Critical",
+            "production_impact": "Full Production Line Stoppage",
+            "iot_details": {
+                "sensor_id": "SN-OP-9988",
+                "telemetry_protocol": "MQTT over TLS",
+                "error_code_display": "FATAL-LINE-HALT"
+            },
+            "updated_by_role": "company_admin",
+            "updated_by_name": "Arafath"
+        },
+        format="json"
+    )
+    assert patch_res.status_code == 200
+    updated = patch_res.json()
+    assert updated["priority"] == "Critical"
+    assert updated["production_impact"] == "Full Production Line Stoppage"
+    assert updated["iot_details"]["error_code_display"] == "FATAL-LINE-HALT"
+

@@ -16,7 +16,8 @@ export type TicketStatus =
   | 'Pending Customer Close' 
   | 'Closed';
 
-export type TicketUrgency = 'Low' | 'Medium' | 'High' | 'Critical';
+export type TicketUrgency = 'Low' | 'Medium' | 'High' | 'Critical' | 'Critical / Emergency';
+export type TicketPriority = 'Low' | 'Medium' | 'High' | 'Critical' | 'Critical / Emergency';
 
 export interface TicketAttachment {
   id: string;
@@ -48,6 +49,13 @@ export interface Ticket {
   affected_system: string;
   category: string;
   urgency: TicketUrgency;
+  priority?: TicketPriority;
+  production_impact?: string;
+  line_number?: string;
+  floor_location?: string;
+  machine_id?: string;
+  iot_details?: Record<string, any>;
+  troubleshooting_checklist?: string[];
   description: string;
   status: TicketStatus;
   company_name: string;
@@ -82,6 +90,9 @@ export interface VisitingReport {
   ticket_id?: string;
   company_name: string;
   target_system: string;
+  priority?: string;
+  line_number?: string;
+  floor_location?: string;
   visiting_engineers: string;
   purpose: string;
   scheduled_date: string;
@@ -103,6 +114,13 @@ export interface TicketUpdateData {
   affected_system?: string;
   category?: string;
   urgency?: TicketUrgency;
+  priority?: TicketPriority;
+  production_impact?: string;
+  line_number?: string;
+  floor_location?: string;
+  machine_id?: string;
+  iot_details?: Record<string, any>;
+  troubleshooting_checklist?: string[];
   description?: string;
   updated_by_name?: string;
   updated_by_role?: string;

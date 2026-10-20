@@ -1,4 +1,4 @@
-import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport } from './types';
+import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport, TicketUrgency, TicketPriority } from './types';
 
 const getDefaultApiBase = (): string => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
@@ -49,7 +49,7 @@ export class SupportApiClient {
       params.append('company_name', companyName);
       params.append('role', role);
     }
-    const res = await fetch(`${this.apiBase}/tickets/stats?${params.toString()}`);
+    const res = await fetch(`${this.apiBase}/tickets/stats/?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to load stats');
     return res.json();
   }
@@ -59,6 +59,7 @@ export class SupportApiClient {
     companyName?: string;
     status?: string;
     urgency?: string;
+    priority?: string;
     category?: string;
     search?: string;
   }): Promise<Ticket[]> {
@@ -69,16 +70,17 @@ export class SupportApiClient {
     }
     if (options.status && options.status !== 'All') params.append('status', options.status);
     if (options.urgency && options.urgency !== 'All') params.append('urgency', options.urgency);
+    if (options.priority && options.priority !== 'All') params.append('priority', options.priority);
     if (options.category && options.category !== 'All') params.append('category', options.category);
     if (options.search) params.append('search', options.search);
 
-    const res = await fetch(`${this.apiBase}/tickets?${params.toString()}`);
+    const res = await fetch(`${this.apiBase}/tickets/?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to load tickets');
     return res.json();
   }
 
   async getTicketDetail(ticketId: string): Promise<Ticket> {
-    const res = await fetch(`${this.apiBase}/tickets/${ticketId}`);
+    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/`);
     if (!res.ok) throw new Error('Failed to fetch ticket details');
     return res.json();
   }
@@ -87,20 +89,32 @@ export class SupportApiClient {
     title: string;
     affected_system: string;
     category: string;
-    urgency: string;
+    urgency: TicketUrgency;
+    priority?: TicketPriority;
+    production_impact?: string;
+    line_number?: string;
+    floor_location?: string;
+    machine_id?: string;
+    iot_details?: Record<string, any>;
+    troubleshooting_checklist?: string[];
     description: string;
     company_name: string;
     created_by_name: string;
     created_by_role: string;
   }): Promise<Ticket> {
-    const res = await fetch(`${this.apiBase}/tickets`, {
+    const res = await fetch(`${this.apiBase}/tickets/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': payload.created_by_role || 'company_admin',
+        'x-user-name': payload.created_by_name || 'Arafath',
+        'x-user-company': payload.company_name || 'CSI Smart Tech Ltd',
+      },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to create ticket');
+      throw new Error(err.detail || err.error || 'Failed to create ticket');
     }
     return res.json();
   }
@@ -111,20 +125,33 @@ export class SupportApiClient {
       title?: string;
       affected_system?: string;
       category?: string;
-      urgency?: string;
+      urgency?: TicketUrgency;
+      priority?: TicketPriority;
+      production_impact?: string;
+      line_number?: string;
+      floor_location?: string;
+      machine_id?: string;
+      iot_details?: Record<string, any>;
+      troubleshooting_checklist?: string[];
       description?: string;
       updated_by_name?: string;
       updated_by_role?: string;
+      company_name?: string;
     }
   ): Promise<Ticket> {
-    const res = await fetch(`${this.apiBase}/tickets/${ticketId}`, {
+    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': payload.updated_by_role || 'company_admin',
+        'x-user-name': payload.updated_by_name || 'Arafath',
+        'x-user-company': payload.company_name || '',
+      },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to update ticket');
+      throw new Error(err.detail || err.error || 'Failed to update ticket');
     }
     return res.json();
   }
@@ -136,9 +163,13 @@ export class SupportApiClient {
     updatedByName: string,
     comment?: string
   ): Promise<{ message: string; status: string }> {
-    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/status`, {
+    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/status/`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': updatedByRole,
+        'x-user-name': updatedByName,
+      },
       body: JSON.stringify({
         status,
         updated_by_role: updatedByRole,
@@ -148,7 +179,7 @@ export class SupportApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to update ticket status');
+      throw new Error(err.detail || err.error || 'Failed to update ticket status');
     }
     return res.json();
   }
@@ -160,9 +191,13 @@ export class SupportApiClient {
     satisfactionRating?: number,
     closeNotes?: string
   ): Promise<{ message: string; status: string }> {
-    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/close`, {
+    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/close/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': closedByRole,
+        'x-user-name': closedByName,
+      },
       body: JSON.stringify({
         closed_by_name: closedByName,
         closed_by_role: closedByRole,
@@ -172,7 +207,7 @@ export class SupportApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to close ticket');
+      throw new Error(err.detail || err.error || 'Failed to close ticket');
     }
     return res.json();
   }
@@ -183,8 +218,12 @@ export class SupportApiClient {
     userRole: string
   ): Promise<{ message: string; status: string }> {
     const params = new URLSearchParams({ user_name: userName, user_role: userRole });
-    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/reopen?${params.toString()}`, {
+    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/reopen/?${params.toString()}`, {
       method: 'POST',
+      headers: {
+        'x-user-role': userRole,
+        'x-user-name': userName,
+      },
     });
     if (!res.ok) throw new Error('Failed to reopen ticket');
     return res.json();
@@ -200,9 +239,13 @@ export class SupportApiClient {
       attachment_name?: string;
     }
   ): Promise<TicketMessage> {
-    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/messages`, {
+    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/messages/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': payload.sender_role,
+        'x-user-name': payload.sender_name,
+      },
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to send message');
@@ -215,7 +258,7 @@ export class SupportApiClient {
     if (ticketId) formData.append('ticket_id', ticketId);
     formData.append('uploaded_by', uploadedBy);
 
-    const res = await fetch(`${this.apiBase}/upload`, {
+    const res = await fetch(`${this.apiBase}/upload/`, {
       method: 'POST',
       body: formData,
     });
@@ -238,7 +281,7 @@ export class SupportApiClient {
     if (options.status && options.status !== 'All') params.append('status', options.status);
     if (options.search) params.append('search', options.search);
 
-    const res = await fetch(`${this.apiBase}/visiting?${params.toString()}`);
+    const res = await fetch(`${this.apiBase}/visiting/?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch visiting reports');
     return res.json();
   }
@@ -246,6 +289,9 @@ export class SupportApiClient {
   async createVisitingReport(payload: {
     company_name: string;
     target_system: string;
+    priority?: string;
+    line_number?: string;
+    floor_location?: string;
     visiting_engineers: string;
     purpose: string;
     scheduled_date: string;
@@ -253,15 +299,21 @@ export class SupportApiClient {
     entry_requirements?: string;
     super_admin_notes?: string;
     ticket_id?: string;
+    user_role?: string;
+    user_name?: string;
   }): Promise<VisitingReport> {
-    const res = await fetch(`${this.apiBase}/visiting`, {
+    const res = await fetch(`${this.apiBase}/visiting/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': payload.user_role || 'super_admin',
+        'x-user-name': payload.user_name || 'Lead Field Engineer',
+      },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to create visiting report');
+      throw new Error(err.detail || err.error || 'Failed to create visiting report');
     }
     return res.json();
   }
@@ -269,11 +321,16 @@ export class SupportApiClient {
   async acknowledgeVisit(
     visitId: string,
     acknowledgedBy: string,
-    notes?: string
+    notes?: string,
+    userRole: string = 'company_admin'
   ): Promise<VisitingReport> {
-    const res = await fetch(`${this.apiBase}/visiting/${visitId}/acknowledge`, {
+    const res = await fetch(`${this.apiBase}/visiting/${visitId}/acknowledge/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': userRole,
+        'x-user-name': acknowledgedBy,
+      },
       body: JSON.stringify({
         acknowledged_by: acknowledgedBy,
         company_acknowledgement_notes: notes,
@@ -281,7 +338,7 @@ export class SupportApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to acknowledge visit');
+      throw new Error(err.detail || err.error || 'Failed to acknowledge visit');
     }
     return res.json();
   }
@@ -289,11 +346,16 @@ export class SupportApiClient {
   async completeVisit(
     visitId: string,
     serviceSummary: string,
-    completedBy?: string
+    completedBy?: string,
+    userRole: string = 'super_admin'
   ): Promise<VisitingReport> {
-    const res = await fetch(`${this.apiBase}/visiting/${visitId}/complete`, {
+    const res = await fetch(`${this.apiBase}/visiting/${visitId}/complete/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': userRole,
+        'x-user-name': completedBy || 'Field Engineer',
+      },
       body: JSON.stringify({
         service_summary: serviceSummary,
         completed_by: completedBy,
@@ -301,7 +363,7 @@ export class SupportApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to complete visit');
+      throw new Error(err.detail || err.error || 'Failed to complete visit');
     }
     return res.json();
   }

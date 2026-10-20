@@ -13,7 +13,7 @@ def health_check(request):
         "status": "online",
         "service": "Plug-and-Play Support Component API (Django DRF + Channels)",
         "architecture": "Domain-Driven Modular",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "database": db_engine
     })
 
@@ -26,9 +26,11 @@ urlpatterns = [
     path('api/health', health_check, name='api-health'),
     path('api/health/', health_check, name='api-health-slash'),
 
-    # Domain API routes
+    # Domain API routes - supports both trailing slash and non-trailing slash
     path('api/tickets/', include('apps.tickets.urls')),
+    path('api/tickets', include('apps.tickets.urls')),
     path('api/visiting/', include('apps.visiting.urls')),
+    path('api/visiting', include('apps.visiting.urls')),
     path('api/upload', include('apps.uploads.urls')),
     path('api/upload/', include('apps.uploads.urls')),
 

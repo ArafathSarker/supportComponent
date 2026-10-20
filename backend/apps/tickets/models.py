@@ -5,7 +5,7 @@ from apps.core.utils import generate_uuid
 
 class Ticket(models.Model):
     """
-    Core support ticket entity representing customer issues and requests.
+    Core support ticket entity representing customer issues and IoT telemetry faults.
     """
     id = models.CharField(primary_key=True, default=generate_uuid, max_length=36, editable=False)
     ticket_code = models.CharField(max_length=30, unique=True, db_index=True)
@@ -13,11 +13,18 @@ class Ticket(models.Model):
     affected_system = models.CharField(max_length=100, default="General System")
     category = models.CharField(max_length=100)
     urgency = models.CharField(max_length=30, default="Medium")
+    priority = models.CharField(max_length=30, default="Medium")
+    production_impact = models.CharField(max_length=100, default="No Production Loss", blank=True)
+    line_number = models.CharField(max_length=100, blank=True, default="")
+    floor_location = models.CharField(max_length=100, blank=True, default="")
+    machine_id = models.CharField(max_length=100, blank=True, default="")
     description = models.TextField()
     status = models.CharField(max_length=50, default="Open")
     company_name = models.CharField(max_length=150, default="CSI Smart Tech Ltd")
     created_by_name = models.CharField(max_length=100, default="Arafath")
     created_by_role = models.CharField(max_length=50, default="company_admin")
+    iot_details = models.JSONField(default=dict, blank=True)
+    troubleshooting_checklist = models.JSONField(default=list, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     closed_by = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)

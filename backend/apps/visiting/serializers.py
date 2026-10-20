@@ -16,6 +16,9 @@ class VisitingReportSerializer(serializers.ModelSerializer):
             'ticket_id',
             'company_name',
             'target_system',
+            'priority',
+            'line_number',
+            'floor_location',
             'visiting_engineers',
             'purpose',
             'scheduled_date',
@@ -40,6 +43,9 @@ class VisitingReportCreateSerializer(serializers.Serializer):
     """
     company_name = serializers.CharField(max_length=150)
     target_system = serializers.CharField(max_length=150)
+    priority = serializers.CharField(max_length=30, default="High", required=False)
+    line_number = serializers.CharField(max_length=100, default="", required=False, allow_blank=True)
+    floor_location = serializers.CharField(max_length=100, default="", required=False, allow_blank=True)
     visiting_engineers = serializers.CharField(max_length=255)
     purpose = serializers.CharField()
     scheduled_date = serializers.CharField(max_length=100)

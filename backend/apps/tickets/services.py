@@ -49,6 +49,10 @@ class TicketService:
         if urgency_val and urgency_val != 'All':
             queryset = queryset.filter(urgency=urgency_val)
 
+        priority_val = filters.get('priority')
+        if priority_val and priority_val != 'All':
+            queryset = queryset.filter(priority=priority_val)
+
         category_val = filters.get('category')
         if category_val and category_val != 'All':
             queryset = queryset.filter(category=category_val)
@@ -59,7 +63,9 @@ class TicketService:
                 Q(title__icontains=search_val) |
                 Q(description__icontains=search_val) |
                 Q(ticket_code__icontains=search_val) |
-                Q(company_name__icontains=search_val)
+                Q(company_name__icontains=search_val) |
+                Q(machine_id__icontains=search_val) |
+                Q(line_number__icontains=search_val)
             )
 
         return queryset
@@ -80,7 +86,14 @@ class TicketService:
             title=data['title'],
             affected_system=data.get('affected_system', 'General System'),
             category=data['category'],
-            urgency=data.get('urgency', 'Medium'),
+            urgency=data.get('urgency', data.get('priority', 'Medium')),
+            priority=data.get('priority', data.get('urgency', 'Medium')),
+            production_impact=data.get('production_impact', 'No Production Loss'),
+            line_number=data.get('line_number', ''),
+            floor_location=data.get('floor_location', ''),
+            machine_id=data.get('machine_id', ''),
+            iot_details=data.get('iot_details', {}),
+            troubleshooting_checklist=data.get('troubleshooting_checklist', []),
             description=data['description'],
             status='Open',
             company_name=effective_company,
@@ -126,7 +139,12 @@ class TicketService:
             raise PermissionDenied("You can only edit tickets belonging to your company.")
 
         changed_fields = []
-        for field in ['title', 'affected_system', 'category', 'urgency', 'description']:
+        updatable = [
+            'title', 'affected_system', 'category', 'urgency', 'priority',
+            'production_impact', 'line_number', 'floor_location', 'machine_id',
+            'description', 'iot_details', 'troubleshooting_checklist'
+        ]
+        for field in updatable:
             if field in data and data[field] is not None:
                 old_val = getattr(ticket, field)
                 new_val = data[field]

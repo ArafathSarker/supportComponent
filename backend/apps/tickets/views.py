@@ -34,6 +34,7 @@ class TicketListCreateView(APIView):
             'company_name': request.query_params.get('company_name'),
             'status': request.query_params.get('status'),
             'urgency': request.query_params.get('urgency'),
+            'priority': request.query_params.get('priority'),
             'category': request.query_params.get('category'),
             'search': request.query_params.get('search'),
         }

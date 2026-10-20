@@ -234,20 +234,48 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         {report.target_system}
                       </h3>
                     </div>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                        report.status === 'Completed'
-                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                          : report.status === 'Acknowledged'
-                          ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
-                          : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-                      }`}
-                    >
-                      {report.status}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {report.priority && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            report.priority === 'Critical'
+                              ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                              : report.priority === 'Urgent'
+                              ? 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40'
+                              : report.priority === 'High'
+                              ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                              : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
+                          }`}
+                        >
+                          {report.priority}
+                        </span>
+                      )}
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                          report.status === 'Completed'
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                            : report.status === 'Acknowledged'
+                            ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                            : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
+                        }`}
+                      >
+                        {report.status}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-gray-300">
+                    {(report.floor_location || report.line_number) && (
+                      <div className="flex items-center gap-2 text-sky-400 font-mono text-[11px]">
+                        <MapPin size={13} className="text-sky-400 shrink-0" />
+                        <span>
+                          {report.floor_location || ''}
+                          {report.floor_location && report.line_number ? ' • ' : ''}
+                          {report.line_number ? `Line: ${report.line_number}` : ''}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-2 text-gray-400">
                       <User size={13} className="text-gray-500 shrink-0" />
                       <span><strong>Engineers:</strong> {report.visiting_engineers}</span>
@@ -328,8 +356,9 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
               <thead>
                 <tr className="bg-[#0d1527] border-b border-[#1f293d] text-gray-400 font-semibold tracking-wider">
                   <th className="py-3 px-4">Visit Ref</th>
-                  <th className="py-3 px-4">Target System</th>
+                  <th className="py-3 px-4">Target System & Floor</th>
                   <th className="py-3 px-4">Company</th>
+                  <th className="py-3 px-4">Priority</th>
                   <th className="py-3 px-4">Visiting Engineers</th>
                   <th className="py-3 px-4">Scheduled Date</th>
                   <th className="py-3 px-4">Status</th>
@@ -339,13 +368,13 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
               <tbody className="divide-y divide-[#1f293d]">
                 {loading && reports.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-10 text-gray-400">
+                    <td colSpan={8} className="text-center py-10 text-gray-400">
                       Loading visiting logs...
                     </td>
                   </tr>
                 ) : reports.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12 text-gray-500">
+                    <td colSpan={8} className="text-center py-12 text-gray-500">
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <FileCheck2 size={28} />
                         <span>No visiting reports found.</span>
@@ -358,11 +387,36 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                       <td className="py-3.5 px-4 font-mono font-bold text-sky-400">
                         {report.visit_code}
                       </td>
-                      <td className="py-3.5 px-4 text-white font-medium">
-                        {report.target_system}
+                      <td className="py-3.5 px-4 text-white">
+                        <div className="font-medium">{report.target_system}</div>
+                        {(report.floor_location || report.line_number) && (
+                          <div className="text-[11px] text-sky-400 font-mono flex items-center gap-1 mt-0.5">
+                            <MapPin size={10} className="shrink-0 text-sky-400" />
+                            <span>
+                              {report.floor_location || ''}
+                              {report.floor_location && report.line_number ? ' • ' : ''}
+                              {report.line_number ? `Line: ${report.line_number}` : ''}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-gray-300">
                         {report.company_name}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            report.priority === 'Critical'
+                              ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                              : report.priority === 'Urgent'
+                              ? 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40'
+                              : report.priority === 'High'
+                              ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                              : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
+                          }`}
+                        >
+                          {report.priority || 'High'}
+                        </span>
                       </td>
                       <td className="py-3.5 px-4 text-gray-400">
                         {report.visiting_engineers}

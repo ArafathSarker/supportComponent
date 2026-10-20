@@ -24,6 +24,9 @@ def test_visiting_report_workflow(client):
         data={
             "company_name": "CSI Smart Tech Ltd",
             "target_system": "Boiler SCADA Terminal B",
+            "priority": "Urgent",
+            "line_number": "Boiler Line 01",
+            "floor_location": "Basement - Boiler & Utility Plant",
             "visiting_engineers": "Engr. Rezaul Karim, Engr. Shahin",
             "purpose": "Sensor probe calibration and thermal imaging audit",
             "scheduled_date": "2026-10-26 11:00 AM",
@@ -38,6 +41,9 @@ def test_visiting_report_workflow(client):
     report = create_res.json()
     visit_id = report["id"]
     assert report["status"] == "Pending Acknowledgement"
+    assert report["priority"] == "Urgent"
+    assert report["line_number"] == "Boiler Line 01"
+    assert report["floor_location"] == "Basement - Boiler & Utility Plant"
 
     # 3. Company Admin acknowledges the visit
     ack_res = client.post(

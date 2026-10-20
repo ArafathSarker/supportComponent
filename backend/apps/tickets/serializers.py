@@ -26,7 +26,7 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
 class TicketListSerializer(serializers.ModelSerializer):
     """
-    Compact ticket serializer for lists, tables, and cards.
+    Compact ticket serializer for lists, tables, and cards with IoT fields.
     """
     message_count = serializers.SerializerMethodField()
     latest_message = serializers.SerializerMethodField()
@@ -40,6 +40,13 @@ class TicketListSerializer(serializers.ModelSerializer):
             'affected_system',
             'category',
             'urgency',
+            'priority',
+            'production_impact',
+            'line_number',
+            'floor_location',
+            'machine_id',
+            'iot_details',
+            'troubleshooting_checklist',
             'description',
             'status',
             'company_name',
@@ -63,7 +70,7 @@ class TicketListSerializer(serializers.ModelSerializer):
 
 class TicketDetailSerializer(serializers.ModelSerializer):
     """
-    Detailed ticket serializer including full chat messages and attachments.
+    Detailed ticket serializer including full chat messages, attachments and IoT telemetry.
     """
     messages = MessageSerializer(many=True, read_only=True)
     attachments = AttachmentSerializer(many=True, read_only=True)
@@ -79,6 +86,13 @@ class TicketDetailSerializer(serializers.ModelSerializer):
             'affected_system',
             'category',
             'urgency',
+            'priority',
+            'production_impact',
+            'line_number',
+            'floor_location',
+            'machine_id',
+            'iot_details',
+            'troubleshooting_checklist',
             'description',
             'status',
             'company_name',
@@ -104,12 +118,23 @@ class TicketDetailSerializer(serializers.ModelSerializer):
 
 class TicketCreateSerializer(serializers.Serializer):
     """
-    Validation schema for creating a new support ticket.
+    Validation schema for creating a new support ticket with IoT metadata.
     """
     title = serializers.CharField(max_length=255)
     affected_system = serializers.CharField(max_length=100, default="General System", required=False)
     category = serializers.CharField(max_length=100)
     urgency = serializers.CharField(max_length=30, default="Medium", required=False)
+    priority = serializers.CharField(max_length=30, default="Medium", required=False)
+    production_impact = serializers.CharField(max_length=100, default="No Production Loss", required=False, allow_blank=True)
+    line_number = serializers.CharField(max_length=100, default="", required=False, allow_blank=True)
+    floor_location = serializers.CharField(max_length=100, default="", required=False, allow_blank=True)
+    machine_id = serializers.CharField(max_length=100, default="", required=False, allow_blank=True)
+    iot_details = serializers.DictField(required=False, default=dict)
+    troubleshooting_checklist = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list
+    )
     description = serializers.CharField()
     company_name = serializers.CharField(max_length=150, default="CSI Smart Tech Ltd", required=False)
     created_by_name = serializers.CharField(max_length=100, default="Arafath", required=False)
@@ -129,4 +154,11 @@ class TicketUpdateSerializer(serializers.Serializer):
     affected_system = serializers.CharField(max_length=100, required=False)
     category = serializers.CharField(max_length=100, required=False)
     urgency = serializers.CharField(max_length=30, required=False)
+    priority = serializers.CharField(max_length=30, required=False)
+    production_impact = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    line_number = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    floor_location = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    machine_id = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    iot_details = serializers.DictField(required=False)
+    troubleshooting_checklist = serializers.ListField(child=serializers.CharField(), required=False)
     description = serializers.CharField(required=False)

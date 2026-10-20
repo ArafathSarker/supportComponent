@@ -10,7 +10,11 @@ import {
   Clock, 
   Tag,
   Edit3,
-  Shield
+  Shield,
+  MapPin,
+  AlertTriangle,
+  CheckCircle2,
+  Flame
 } from 'lucide-react';
 import type { Ticket, TicketStats, CurrentUser } from './types';
 import { api } from './api';
@@ -47,6 +51,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [urgencyFilter, setUrgencyFilter] = useState('All');
+  const [priorityFilter, setPriorityFilter] = useState('All');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
@@ -62,6 +67,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
           companyName: currentUser.company_name,
           status: statusFilter,
           urgency: urgencyFilter,
+          priority: priorityFilter,
           search: search.trim()
         }),
         api.getStats(currentUser.role, currentUser.company_name)
@@ -77,7 +83,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [currentUser.role, currentUser.company_name, statusFilter, urgencyFilter]);
+  }, [currentUser.role, currentUser.company_name, statusFilter, urgencyFilter, priorityFilter]);
 
   // Global WebSocket notification listener for real-time table sync
   useEffect(() => {
@@ -141,6 +147,31 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
     }) + ', ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const renderPriorityBadge = (priorityVal?: string, urgencyVal?: string) => {
+    const val = priorityVal || urgencyVal || 'Medium';
+    const isCritical = val === 'Critical';
+    const isUrgent = val === 'Urgent';
+    const isHigh = val === 'High';
+    const isMed = val === 'Medium';
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+        isCritical
+          ? 'bg-red-500/20 text-red-400 border-red-500/40'
+          : isUrgent
+          ? 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40 shadow-[0_0_10px_rgba(217,70,239,0.25)]'
+          : isHigh
+          ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+          : isMed
+          ? 'bg-amber-500/15 text-amber-400 border-amber-500/25'
+          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
+      }`}>
+        {(isUrgent || isCritical) && <Flame size={11} className={isCritical ? 'text-red-400' : 'text-fuchsia-300'} />}
+        {val}
+      </span>
+    );
+  };
+
   return (
     <div className="w-full">
       {/* 1. Stat Cards Metrics */}
@@ -150,9 +181,14 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
       <div className="bg-[#111827] border border-[#1f293d] rounded-xl overflow-hidden shadow-2xl">
         {/* Toolbar Header */}
         <div className="p-5 border-b border-[#1f293d] flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-base font-semibold text-white tracking-wide">
-            Support Tickets
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold text-white tracking-wide">
+              Support Tickets
+            </h2>
+            <span className="text-xs text-gray-400 bg-gray-800/60 px-2.5 py-0.5 rounded-full border border-gray-700/50">
+              Garment IoT Operations
+            </span>
+          </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Search Input */}
@@ -160,7 +196,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
               <Search size={15} className="absolute left-3 text-gray-500 pointer-events-none" />
               <input
                 type="text"
-                placeholder="search details or machine ref..."
+                placeholder="search machine, line, tag..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && loadData()}
@@ -180,6 +216,20 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
               <option value="In Progress">In Progress</option>
               <option value="Pending Customer Close">Pending Customer Close</option>
               <option value="Closed">Closed</option>
+            </select>
+
+            {/* Priority Filter */}
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="bg-[#0b1120] border border-[#1f293d] text-gray-200 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All">All Priorities</option>
+              <option value="Urgent">⚡ Urgent</option>
+              <option value="Critical">🔴 Critical</option>
+              <option value="High">🟠 High</option>
+              <option value="Medium">🟡 Medium</option>
+              <option value="Low">🟢 Low</option>
             </select>
 
             {/* Urgency Filter */}
@@ -260,10 +310,10 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
               <thead>
                 <tr className="bg-[#0d1527] border-b border-[#1f293d] text-gray-400 font-semibold tracking-wider">
                   <th className="py-3 px-4">Ticket ID</th>
-                  <th className="py-3 px-4">Title / Problem Summary</th>
-                  <th className="py-3 px-4">Affected System</th>
-                  <th className="py-3 px-4">Problem Category</th>
-                  <th className="py-3 px-4">Urgency Level</th>
+                  <th className="py-3 px-4">Title / Machine Incident</th>
+                  <th className="py-3 px-4">System & Location</th>
+                  <th className="py-3 px-4">Category</th>
+                  <th className="py-3 px-4">Priority</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Created At</th>
                   <th className="py-3 px-4 text-center">Actions</th>
@@ -298,15 +348,33 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
 
                       <td className="py-3.5 px-4 max-w-xs">
                         <div className="font-medium text-white truncate">{ticket.title}</div>
-                        {ticket.latest_message && (
-                          <div className="text-[11px] text-gray-400 truncate mt-0.5">
-                            💬 {ticket.latest_message}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          {ticket.production_impact && ticket.production_impact !== 'No Production Loss' && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                              <AlertTriangle size={10} />
+                              {ticket.production_impact}
+                            </span>
+                          )}
+                          {ticket.latest_message && (
+                            <span className="text-[11px] text-gray-400 truncate">
+                              💬 {ticket.latest_message}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-4 text-gray-300">
-                        {ticket.affected_system}
+                        <div className="font-medium">{ticket.affected_system}</div>
+                        {(ticket.line_number || ticket.machine_id) && (
+                          <div className="text-[11px] text-sky-400/90 font-mono flex items-center gap-1 mt-0.5">
+                            <MapPin size={10} className="shrink-0 text-sky-400" />
+                            <span>
+                              {ticket.line_number || ''}
+                              {ticket.line_number && ticket.machine_id ? ' • ' : ''}
+                              {ticket.machine_id ? `ID: ${ticket.machine_id}` : ''}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4 text-gray-400">
@@ -314,17 +382,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                          ticket.urgency === 'Critical'
-                            ? 'bg-red-500/20 text-red-400 border-red-500/35 font-semibold'
-                            : ticket.urgency === 'High'
-                            ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
-                            : ticket.urgency === 'Medium'
-                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-                            : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
-                        }`}>
-                          {ticket.urgency}
-                        </span>
+                        {renderPriorityBadge(ticket.priority, ticket.urgency)}
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -403,17 +461,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
                       {ticket.ticket_code}
                     </span>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
-                        ticket.urgency === 'Critical'
-                          ? 'bg-red-500/20 text-red-400 border-red-500/35 font-semibold'
-                          : ticket.urgency === 'High'
-                          ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
-                          : ticket.urgency === 'Medium'
-                          ? 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-                          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
-                      }`}>
-                        {ticket.urgency}
-                      </span>
+                      {renderPriorityBadge(ticket.priority, ticket.urgency)}
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
                         ticket.status === 'Closed'
                           ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
@@ -428,23 +476,49 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
                     </div>
                   </div>
 
-                  {/* Title */}
+                  {/* Title & Production Impact */}
                   <div>
                     <h3 className="text-sm font-semibold text-white line-clamp-2">
                       {ticket.title}
                     </h3>
+                    {ticket.production_impact && ticket.production_impact !== 'No Production Loss' && (
+                      <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/15 text-red-300 border border-red-500/30">
+                        <AlertTriangle size={11} className="text-red-400" />
+                        <span>{ticket.production_impact}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* System & Category */}
-                  <div className="space-y-1 text-xs text-gray-400">
+                  <div className="space-y-1.5 text-xs text-gray-400">
                     <div className="flex items-center gap-1.5 text-gray-300">
                       <Cpu size={13} className="text-blue-400 shrink-0" />
                       <span className="truncate">{ticket.affected_system}</span>
                     </div>
+
+                    {(ticket.line_number || ticket.machine_id) && (
+                      <div className="flex items-center gap-1.5 text-sky-400 font-mono text-[11px]">
+                        <MapPin size={13} className="shrink-0 text-sky-400" />
+                        <span className="truncate">
+                          {ticket.line_number || ''}
+                          {ticket.line_number && ticket.machine_id ? ' • ' : ''}
+                          {ticket.machine_id ? `ID: ${ticket.machine_id}` : ''}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-1.5 text-gray-400">
                       <Tag size={13} className="text-gray-500 shrink-0" />
                       <span className="truncate">{ticket.category}</span>
                     </div>
+
+                    {/* Troubleshooting checklist completion pill */}
+                    {ticket.troubleshooting_checklist && ticket.troubleshooting_checklist.length > 0 && (
+                      <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                        <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
+                        <span>{ticket.troubleshooting_checklist.length} Pre-checks Verified</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Latest Message Snippet */}

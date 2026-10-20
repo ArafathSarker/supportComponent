@@ -11,7 +11,11 @@ import {
   Star,
   MessageSquare,
   Info,
-  Edit3
+  Edit3,
+  Flame,
+  MapPin,
+  Cpu,
+  Check
 } from 'lucide-react';
 import type { Ticket, TicketMessage, CurrentUser, TicketStatus } from './types';
 import { api } from './api';
@@ -412,14 +416,85 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               </span>
             </div>
 
-            <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                Problem Category
-              </span>
-              <span className="text-xs text-gray-200 bg-gray-800/80 px-2 py-1 rounded-md inline-block">
-                {ticket.category}
-              </span>
+            {/* Category & Priority */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                  Category
+                </span>
+                <span className="text-xs text-gray-200 bg-gray-800/80 px-2 py-1 rounded-md inline-block truncate max-w-full">
+                  {ticket.category}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                  Priority / Impact
+                </span>
+                <span className={`text-xs px-2 py-1 rounded-md font-semibold inline-flex items-center gap-1 border ${
+                  ticket.priority?.includes('Critical') || ticket.urgency === 'Critical'
+                    ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                    : ticket.priority === 'High' || ticket.urgency === 'High'
+                    ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                    : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                }`}>
+                  <Flame size={12} />
+                  <span>{ticket.priority || ticket.urgency}</span>
+                </span>
+              </div>
             </div>
+
+            {/* Garments Floor & Machine Location */}
+            {(ticket.line_number || ticket.floor_location || ticket.machine_id) && (
+              <div className="p-2.5 bg-[#0b1120] border border-[#1f293d] rounded-xl space-y-1.5 text-xs">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                  <MapPin size={11} className="text-blue-400" />
+                  <span>Factory Machine Location</span>
+                </span>
+                <div className="space-y-0.5 text-gray-300">
+                  {ticket.line_number && <div><span className="text-gray-500">Line:</span> {ticket.line_number}</div>}
+                  {ticket.floor_location && <div><span className="text-gray-500">Floor:</span> {ticket.floor_location}</div>}
+                  {ticket.machine_id && <div><span className="text-gray-500">Machine Tag:</span> <span className="font-mono text-blue-400">{ticket.machine_id}</span></div>}
+                  {ticket.production_impact && <div><span className="text-gray-500">Impact:</span> <span className="text-amber-400">{ticket.production_impact}</span></div>}
+                </div>
+              </div>
+            )}
+
+            {/* Dynamic IoT Telemetry Parameters */}
+            {ticket.iot_details && Object.keys(ticket.iot_details).length > 0 && (
+              <div className="p-2.5 bg-[#0b1424] border border-blue-900/30 rounded-xl space-y-2 text-xs">
+                <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1">
+                  <Cpu size={12} className="text-blue-400" />
+                  <span>Dynamic IoT Parameters</span>
+                </span>
+                <div className="space-y-1">
+                  {Object.entries(ticket.iot_details).map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between gap-2 border-b border-blue-900/20 pb-1 text-[11px]">
+                      <span className="text-gray-400 capitalize">{k.replace(/_/g, ' ')}:</span>
+                      <span className="text-blue-200 font-mono font-medium truncate max-w-[150px]">{String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Verified Pre-Troubleshooting Checklist */}
+            {ticket.troubleshooting_checklist && ticket.troubleshooting_checklist.length > 0 && (
+              <div className="p-2.5 bg-[#101b2b] border border-indigo-900/30 rounded-xl space-y-1.5 text-xs">
+                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1">
+                  <Check size={12} className="text-emerald-400" />
+                  <span>Pre-Checklist Verified ({ticket.troubleshooting_checklist.length})</span>
+                </span>
+                <ul className="space-y-1 text-[11px] text-gray-300">
+                  {ticket.troubleshooting_checklist.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-1.5">
+                      <span className="text-emerald-400 font-bold">✓</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>

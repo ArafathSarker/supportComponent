@@ -15,11 +15,27 @@ import {
   Flame,
   MapPin,
   Cpu,
-  Check
+  Check,
+  Image as ImageIcon,
+  Video,
+  FileText,
+  Maximize2,
+  Eye,
+  Loader2
 } from 'lucide-react';
 import type { Ticket, TicketMessage, CurrentUser, TicketStatus } from './types';
 import { api } from './api';
 import { EditTicketModal } from './EditTicketModal';
+
+const isImageFile = (filename: string = '', fileType?: string) => {
+  if (fileType?.startsWith('image/')) return true;
+  return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(filename);
+};
+
+const isVideoFile = (filename: string = '', fileType?: string) => {
+  if (fileType?.startsWith('video/')) return true;
+  return /\.(mp4|webm|mov|mkv|ogg)$/i.test(filename);
+};
 
 interface TicketLiveChatDrawerProps {
   ticketId: string | null;
@@ -47,6 +63,10 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
   const [closeNotes, setCloseNotes] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [mobileDrawerTab, setMobileDrawerTab] = useState<'chat' | 'details'>('chat');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingFilePreview, setPendingFilePreview] = useState<string | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [activeLightboxImage, setActiveLightboxImage] = useState<{ url: string; title: string } | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -170,13 +190,33 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
 
   const handleSendMessage = async () => {
     const text = inputText.trim();
-    if (!text && !socketRef.current) return;
+    if (!text && !pendingFile) return;
+    if (uploadingFile || !ticket) return;
+
+    let attachmentUrl: string | undefined = undefined;
+    let attachmentName: string | undefined = undefined;
+
+    if (pendingFile) {
+      try {
+        setUploadingFile(true);
+        const uploadRes = await api.uploadFile(pendingFile, ticket.id, currentUser.name);
+        attachmentUrl = uploadRes.url;
+        attachmentName = uploadRes.filename || pendingFile.name;
+      } catch (err: any) {
+        alert(err.message || 'Failed to upload attachment file.');
+        setUploadingFile(false);
+        return;
+      } finally {
+        setUploadingFile(false);
+      }
+    }
 
     const payload = {
       type: 'chat_message',
       sender_name: currentUser.name,
       sender_role: currentUser.role,
-      message: text
+      message: text || (attachmentName ? `Attached file: ${attachmentName}` : ''),
+      ...(attachmentUrl ? { attachment_url: attachmentUrl, attachment_name: attachmentName } : {})
     };
 
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -186,7 +226,9 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
         const created = await api.sendMessage(ticket.id, {
           sender_name: currentUser.name,
           sender_role: currentUser.role,
-          message: text
+          message: payload.message,
+          attachment_url: payload.attachment_url,
+          attachment_name: payload.attachment_name
         });
         setMessages((prev) => {
           if (prev.some((m) => m.id === created.id)) return prev;
@@ -198,6 +240,14 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
     }
 
     setInputText('');
+    handleRemovePendingFile();
+
+    if (attachmentUrl) {
+      api.getTicketDetail(ticket.id).then((fresh) => {
+        setTicket(fresh);
+        onTicketUpdated(fresh);
+      }).catch((e) => console.error('Failed to refresh ticket attachments:', e));
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -217,29 +267,27 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !ticket) return;
+    if (!file) return;
 
-    try {
-      const uploadRes = await api.uploadFile(file, ticket.id, currentUser.name);
-      const payload = {
-        type: 'chat_message',
-        sender_name: currentUser.name,
-        sender_role: currentUser.role,
-        message: `Attached: ${uploadRes.filename}`,
-        attachment_url: uploadRes.url,
-        attachment_name: uploadRes.filename
-      };
-
-      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-        socketRef.current.send(JSON.stringify(payload));
-      } else {
-        await api.sendMessage(ticket.id, payload);
-      }
-    } catch (err) {
-      alert('Failed to upload file');
+    setPendingFile(file);
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPendingFilePreview(url);
+    } else {
+      setPendingFilePreview(null);
     }
+    // Reset so same file could be re-selected if canceled
+    e.target.value = '';
+  };
+
+  const handleRemovePendingFile = () => {
+    if (pendingFilePreview) {
+      URL.revokeObjectURL(pendingFilePreview);
+    }
+    setPendingFile(null);
+    setPendingFilePreview(null);
   };
 
   const handleStatusChange = async (newStatus: TicketStatus) => {
@@ -528,28 +576,130 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               </div>
             </div>
 
-            {/* Evidence Attachments */}
-            {ticket.attachments && ticket.attachments.length > 0 && (
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-2">
-                  Evidence Attachments ({ticket.attachments.length})
+            {/* Uploaded Supporting Evidence (Photos & Videos) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon size={13} className="text-blue-400" />
+                  <span>Uploaded Evidence (Photos & Videos)</span>
                 </span>
-                <div className="space-y-1.5">
-                  {ticket.attachments.map((att) => (
-                    <a
-                      key={att.id}
-                      href={att.file_path}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-2 bg-[#0b1120] border border-[#1f293d] rounded-lg text-xs text-blue-400 hover:text-blue-300 hover:border-blue-500/50 transition-colors"
-                    >
-                      <span className="truncate max-w-[180px]">{att.file_name}</span>
-                      <Download size={13} />
-                    </a>
-                  ))}
-                </div>
+                {ticket.attachments && ticket.attachments.length > 0 && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
+                    {ticket.attachments.length} file{ticket.attachments.length > 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
-            )}
+
+              {!ticket.attachments || ticket.attachments.length === 0 ? (
+                <div className="p-3 bg-[#0b1120] border border-[#1f293d] rounded-xl text-center text-xs text-gray-500">
+                  No photos or videos attached to this ticket.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {ticket.attachments.map((att) => {
+                    const isImg = isImageFile(att.file_name, att.file_type);
+                    const isVid = isVideoFile(att.file_name, att.file_type);
+                    const fileUrl = api.getFileUrl(att.file_path);
+
+                    if (isImg) {
+                      return (
+                        <div
+                          key={att.id}
+                          className="group relative bg-[#0b1120] border border-[#1f293d] hover:border-blue-500/50 rounded-xl overflow-hidden shadow-sm transition-all"
+                        >
+                          <div 
+                            className="relative h-36 w-full cursor-pointer bg-black/40 overflow-hidden"
+                            onClick={() => setActiveLightboxImage({ url: fileUrl, title: att.file_name })}
+                          >
+                            <img
+                              src={fileUrl}
+                              alt={att.file_name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                // fallback if broken path
+                                (e.target as HTMLImageElement).src = fileUrl;
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
+                              <span className="p-2 rounded-full bg-blue-600/90 text-white shadow-lg">
+                                <Maximize2 size={16} />
+                              </span>
+                            </div>
+                          </div>
+                          <div className="p-2.5 flex items-center justify-between text-xs text-gray-300 bg-[#0d1527]">
+                            <div className="truncate mr-2">
+                              <p className="font-medium text-white truncate text-[11px]">{att.file_name}</p>
+                              <p className="text-[10px] text-gray-500">
+                                {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Image'} • {att.uploaded_by || 'Evidence'}
+                              </p>
+                            </div>
+                            <a
+                              href={fileUrl}
+                              download={att.file_name}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors shrink-0"
+                              title="Download image"
+                            >
+                              <Download size={13} />
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isVid) {
+                      return (
+                        <div
+                          key={att.id}
+                          className="bg-[#0b1120] border border-purple-900/40 rounded-xl overflow-hidden shadow-sm space-y-1.5 p-2.5"
+                        >
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 mb-1">
+                            <Video size={14} className="text-purple-400" />
+                            <span className="truncate">{att.file_name}</span>
+                          </div>
+                          <video
+                            src={fileUrl}
+                            controls
+                            preload="metadata"
+                            className="w-full max-h-44 rounded-lg bg-black border border-gray-800"
+                          />
+                          <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1">
+                            <span>{att.file_size ? `${(att.file_size / 1024 / 1024).toFixed(1)} MB` : 'Video file'}</span>
+                            <a
+                              href={fileUrl}
+                              download={att.file_name}
+                              className="text-purple-400 hover:underline flex items-center gap-1"
+                            >
+                              <Download size={11} /> Download Video
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <a
+                        key={att.id}
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-2.5 bg-[#0b1120] border border-[#1f293d] hover:border-blue-500/40 rounded-xl text-xs text-gray-200 transition-colors group"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <FileText size={15} className="text-blue-400 shrink-0" />
+                          <div className="truncate">
+                            <p className="font-medium text-white truncate text-[11px] group-hover:text-blue-400">{att.file_name}</p>
+                            <p className="text-[10px] text-gray-500">{att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Document'}</p>
+                          </div>
+                        </div>
+                        <Download size={13} className="text-gray-400 group-hover:text-white shrink-0 ml-2" />
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Role Action & Rules Box */}
             <div className="pt-4 border-t border-[#1f293d] space-y-3">
@@ -680,15 +830,46 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
 
                       {msg.attachment_url && (
                         <div className="mt-2 pt-2 border-t border-white/20">
-                          <a
-                            href={msg.attachment_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-blue-200 underline"
-                          >
-                            <Paperclip size={12} />
-                            {msg.attachment_name || 'Download Attachment'}
-                          </a>
+                          {isImageFile(msg.attachment_name, '') ? (
+                            <div 
+                              className="cursor-pointer group relative overflow-hidden rounded-lg border border-white/20 max-w-[240px] max-h-48"
+                              onClick={() => setActiveLightboxImage({ url: api.getFileUrl(msg.attachment_url!), title: msg.attachment_name || 'Attached Photo' })}
+                            >
+                              <img
+                                src={api.getFileUrl(msg.attachment_url)}
+                                alt={msg.attachment_name || 'Attachment'}
+                                className="w-full h-auto object-cover group-hover:scale-105 transition-transform"
+                              />
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <Eye size={18} className="text-white drop-shadow" />
+                              </div>
+                            </div>
+                          ) : isVideoFile(msg.attachment_name, '') ? (
+                            <div className="space-y-1">
+                              <video
+                                src={api.getFileUrl(msg.attachment_url)}
+                                controls
+                                className="max-w-xs max-h-48 rounded-lg bg-black border border-white/20"
+                              />
+                              <a
+                                href={api.getFileUrl(msg.attachment_url)}
+                                download={msg.attachment_name}
+                                className="text-[11px] text-purple-200 hover:underline flex items-center gap-1"
+                              >
+                                <Download size={11} /> {msg.attachment_name || 'Download Video'}
+                              </a>
+                            </div>
+                          ) : (
+                            <a
+                              href={api.getFileUrl(msg.attachment_url)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-blue-200 hover:underline"
+                            >
+                              <Paperclip size={12} />
+                              {msg.attachment_name || 'Download Attachment'}
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>
@@ -707,44 +888,83 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               )}
             </div>
 
+            {/* Pending File Attachment Preview (Not uploaded until user clicks Send) */}
+            {pendingFile && (
+              <div className="mx-2.5 sm:mx-4 mb-2 p-2.5 bg-[#0b1424] border border-blue-500/40 rounded-xl flex items-center justify-between gap-3 animate-fadeIn">
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  {pendingFilePreview ? (
+                    <img 
+                      src={pendingFilePreview} 
+                      alt="Preview" 
+                      className="w-11 h-11 object-cover rounded-lg border border-blue-500/30 shrink-0" 
+                    />
+                  ) : isVideoFile(pendingFile.name, pendingFile.type) ? (
+                    <div className="w-11 h-11 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                      <Video size={18} />
+                    </div>
+                  ) : (
+                    <div className="w-11 h-11 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                      <FileText size={18} />
+                    </div>
+                  )}
+                  <div className="truncate">
+                    <p className="text-xs font-semibold text-white truncate max-w-[200px] sm:max-w-xs">{pendingFile.name}</p>
+                    <p className="text-[10px] text-gray-400">
+                      {(pendingFile.size / 1024).toFixed(1)} KB • Staged for send
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemovePendingFile}
+                  disabled={uploadingFile}
+                  className="p-1 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                  title="Remove attachment"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            )}
+
             {/* Chat Input Toolbar */}
             <div className="p-2.5 sm:p-4 bg-[#111827] border-t border-[#1f293d] flex items-end gap-2 shrink-0">
               <input
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
-                onChange={handleFileUpload}
+                onChange={handleFileSelect}
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                title="Attach evidence file"
-                className="p-2 sm:p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-[#1f293d] transition-colors shrink-0"
+                disabled={ticket.status === 'Closed' || uploadingFile}
+                title="Choose file to attach"
+                className="p-2 sm:p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-[#1f293d] transition-colors shrink-0 disabled:opacity-40"
               >
                 <Paperclip size={16} />
               </button>
 
               <textarea
                 rows={1}
-                placeholder="Type your message..."
+                placeholder={pendingFile ? "Add a message or click Send to upload..." : "Type your message..."}
                 value={inputText}
                 onChange={(e) => {
                   setInputText(e.target.value);
                   handleTyping();
                 }}
                 onKeyDown={handleKeyDown}
-                disabled={ticket.status === 'Closed'}
+                disabled={ticket.status === 'Closed' || uploadingFile}
                 className="flex-1 bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:border-blue-500 resize-none max-h-24 disabled:opacity-50"
               />
 
               <button
                 type="button"
                 onClick={handleSendMessage}
-                disabled={ticket.status === 'Closed' || !inputText.trim()}
-                title="Send message"
-                className="p-2 sm:p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-colors disabled:opacity-40 shrink-0"
+                disabled={ticket.status === 'Closed' || (!inputText.trim() && !pendingFile) || uploadingFile}
+                title="Send message and attachments"
+                className="p-2 sm:p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-colors disabled:opacity-40 shrink-0 flex items-center justify-center min-w-[38px]"
               >
-                <Send size={16} />
+                {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </div>
           </div>
@@ -830,6 +1050,49 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
           setIsEditModalOpen(false);
         }}
       />
+
+      {/* Full-Screen Lightbox Modal for Photo Inspection */}
+      {activeLightboxImage && (
+        <div 
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fadeIn"
+          onClick={() => setActiveLightboxImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-[92vh] w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full flex items-center justify-between text-white pb-3 px-2 border-b border-gray-800 mb-3">
+              <div className="flex items-center gap-2 truncate max-w-md">
+                <ImageIcon size={18} className="text-blue-400 shrink-0" />
+                <span className="text-sm font-semibold truncate">{activeLightboxImage.title}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={activeLightboxImage.url}
+                  download={activeLightboxImage.title}
+                  className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium"
+                  title="Download image"
+                >
+                  <Download size={15} />
+                  <span>Download</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setActiveLightboxImage(null)}
+                  className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white transition-colors"
+                  title="Close viewer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[80vh] overflow-auto flex items-center justify-center p-1">
+              <img
+                src={activeLightboxImage.url}
+                alt={activeLightboxImage.title}
+                className="max-h-[78vh] max-w-full object-contain rounded-xl border border-gray-800 shadow-2xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

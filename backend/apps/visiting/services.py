@@ -22,10 +22,41 @@ class VisitingReportService:
         return report
 
     @staticmethod
-    def list_reports(role: str = None, company_name: str = None):
+    def list_reports(filters: dict = None, role: str = None, company_name: str = None):
+        if filters is None:
+            filters = {}
+
         queryset = VisitingReport.objects.all().select_related('ticket')
-        if role == 'company_admin' and company_name:
-            queryset = queryset.filter(company_name=company_name)
+
+        role_val = filters.get('role') or role
+        company_val = filters.get('company_name') or company_name
+        if role_val == 'company_admin' and company_val:
+            queryset = queryset.filter(company_name=company_val)
+
+        status_val = filters.get('status')
+        if status_val and status_val != 'All':
+            queryset = queryset.filter(status=status_val)
+
+        priority_val = filters.get('priority')
+        if priority_val and priority_val != 'All':
+            queryset = queryset.filter(priority=priority_val)
+
+        search_val = filters.get('search')
+        if search_val:
+            from django.db.models import Q
+            search_val = search_val.strip()
+            queryset = queryset.filter(
+                Q(visit_code__icontains=search_val) |
+                Q(target_system__icontains=search_val) |
+                Q(company_name__icontains=search_val) |
+                Q(visiting_engineers__icontains=search_val) |
+                Q(purpose__icontains=search_val) |
+                Q(line_number__icontains=search_val) |
+                Q(floor_location__icontains=search_val) |
+                Q(status__icontains=search_val) |
+                Q(priority__icontains=search_val)
+            )
+
         return queryset
 
     @staticmethod

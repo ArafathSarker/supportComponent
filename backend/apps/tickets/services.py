@@ -59,13 +59,20 @@ class TicketService:
 
         search_val = filters.get('search')
         if search_val:
+            search_val = search_val.strip()
             queryset = queryset.filter(
                 Q(title__icontains=search_val) |
                 Q(description__icontains=search_val) |
                 Q(ticket_code__icontains=search_val) |
                 Q(company_name__icontains=search_val) |
+                Q(affected_system__icontains=search_val) |
+                Q(category__icontains=search_val) |
                 Q(machine_id__icontains=search_val) |
-                Q(line_number__icontains=search_val)
+                Q(line_number__icontains=search_val) |
+                Q(floor_location__icontains=search_val) |
+                Q(created_by_name__icontains=search_val) |
+                Q(priority__icontains=search_val) |
+                Q(status__icontains=search_val)
             )
 
         return queryset

@@ -70,3 +70,20 @@ def test_visiting_report_workflow(client):
     assert comp_res.status_code == 200
     assert comp_res.json()["status"] == "Completed"
     assert "audit finished" in comp_res.json()["service_summary"]
+
+    # 5. Test filtering by status, priority, and search query
+    list_res = client.get("/api/visiting/?status=Completed&priority=Urgent")
+    assert list_res.status_code == 200
+    assert len(list_res.json()) >= 1
+    assert list_res.json()[0]["id"] == visit_id
+
+    # Search by engineer name or location
+    search_res = client.get("/api/visiting/?search=Rezaul")
+    assert search_res.status_code == 200
+    assert any(r["id"] == visit_id for r in search_res.json())
+
+    # Search with no match
+    nomatch_res = client.get("/api/visiting/?search=NonExistentKeywordXYZ")
+    assert nomatch_res.status_code == 200
+    assert len(nomatch_res.json()) == 0
+

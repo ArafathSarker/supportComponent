@@ -14,7 +14,8 @@ import {
   MapPin,
   AlertTriangle,
   CheckCircle2,
-  Flame
+  Flame,
+  X
 } from 'lucide-react';
 import type { Ticket, TicketStats, CurrentUser } from './types';
 import { api } from './api';
@@ -22,6 +23,7 @@ import { StatCards } from './StatCards';
 import { RaiseTicketModal } from './RaiseTicketModal';
 import { EditTicketModal } from './EditTicketModal';
 import { TicketLiveChatDrawer } from './TicketLiveChatDrawer';
+import { GARMENTS_IOT_CATEGORIES } from './iotConfig';
 
 interface SupportTicketsProps {
   currentUser: CurrentUser;
@@ -49,14 +51,24 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
   });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [urgencyFilter, setUrgencyFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
+
+  // Debounce search input so typing automatically queries without requiring Enter
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadData = async () => {
     try {
@@ -68,7 +80,8 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
           status: statusFilter,
           urgency: urgencyFilter,
           priority: priorityFilter,
-          search: search.trim()
+          category: categoryFilter,
+          search: debouncedSearch.trim()
         }),
         api.getStats(currentUser.role, currentUser.company_name)
       ]);
@@ -83,7 +96,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [currentUser.role, currentUser.company_name, statusFilter, urgencyFilter, priorityFilter]);
+  }, [currentUser.role, currentUser.company_name, statusFilter, urgencyFilter, priorityFilter, categoryFilter, debouncedSearch]);
 
   // Global WebSocket notification listener for real-time table sync
   useEffect(() => {
@@ -191,18 +204,42 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Search Input */}
+            {/* Search Input with Clear Button */}
             <div className="relative flex items-center">
               <Search size={15} className="absolute left-3 text-gray-500 pointer-events-none" />
               <input
                 type="text"
-                placeholder="search machine, line, tag..."
+                placeholder="search machine, line, keyword..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && loadData()}
-                className="bg-[#0b1120] border border-[#1f293d] text-gray-100 pl-9 pr-3 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                className="bg-[#0b1120] border border-[#1f293d] text-gray-100 pl-9 pr-8 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 p-0.5 rounded text-gray-400 hover:text-white transition-colors"
+                  title="Clear search"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
+
+            {/* Category Filter */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="bg-[#0b1120] border border-[#1f293d] text-gray-200 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-blue-500 cursor-pointer max-w-[160px] truncate"
+              title="Filter by Problem Category"
+            >
+              <option value="All">All Categories</option>
+              {(categories && categories.length > 0 ? categories : GARMENTS_IOT_CATEGORIES.map((c) => c.category)).map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
 
             {/* Status Filter */}
             <select

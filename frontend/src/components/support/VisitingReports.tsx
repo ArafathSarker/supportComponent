@@ -10,7 +10,8 @@ import {
   ShieldCheck, 
   FileCheck2,
   LayoutList,
-  LayoutGrid
+  LayoutGrid,
+  X
 } from 'lucide-react';
 import type { VisitingReport, CurrentUser } from './types';
 import { api } from './api';
@@ -25,7 +26,9 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
   const [reports, setReports] = useState<VisitingReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [priorityFilter, setPriorityFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -34,6 +37,14 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
   const [completeSummary, setCompleteSummary] = useState('');
   const [completing, setCompleting] = useState(false);
 
+  // Debounce search input so typing automatically queries without requiring Enter
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const loadReports = async () => {
     try {
       setLoading(true);
@@ -41,7 +52,8 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
         role: currentUser.role,
         companyName: currentUser.company_name,
         status: statusFilter,
-        search: search.trim()
+        priority: priorityFilter,
+        search: debouncedSearch.trim()
       });
       setReports(data);
     } catch (err) {
@@ -53,7 +65,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
 
   useEffect(() => {
     loadReports();
-  }, [currentUser.role, currentUser.company_name, statusFilter]);
+  }, [currentUser.role, currentUser.company_name, statusFilter, priorityFilter, debouncedSearch]);
 
   // Real-time synchronization for visiting reports
   useEffect(() => {
@@ -132,12 +144,21 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
               <Search size={15} className="absolute left-3 text-gray-500 pointer-events-none" />
               <input
                 type="text"
-                placeholder="search visit code or system..."
+                placeholder="search visit code, system, engineer..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && loadReports()}
-                className="bg-[#0b1120] border border-[#1f293d] text-gray-100 pl-9 pr-3 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500"
+                className="bg-[#0b1120] border border-[#1f293d] text-gray-100 pl-9 pr-8 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 p-0.5 rounded text-gray-400 hover:text-white transition-colors"
+                  title="Clear search"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
 
             {/* Status Filter */}
@@ -150,6 +171,20 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
               <option value="Pending Acknowledgement">Pending Acknowledgement</option>
               <option value="Acknowledged">Acknowledged</option>
               <option value="Completed">Completed</option>
+            </select>
+
+            {/* Priority Filter */}
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="bg-[#0b1120] border border-[#1f293d] text-gray-200 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All">All Priorities</option>
+              <option value="Urgent">⚡ Urgent</option>
+              <option value="Critical">🔴 Critical</option>
+              <option value="High">🟠 High</option>
+              <option value="Medium">🟡 Medium</option>
+              <option value="Low">🟢 Low</option>
             </select>
 
             {/* Refresh */}

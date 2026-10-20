@@ -137,13 +137,19 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
       });
 
       // Upload file attachments if any
+      let finalTicket = created;
       if (files && files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           await api.uploadFile(files[i], created.id, currentUser.name);
         }
+        try {
+          finalTicket = await api.getTicketDetail(created.id);
+        } catch {
+          finalTicket = created;
+        }
       }
 
-      onTicketCreated(created);
+      onTicketCreated(finalTicket);
       onClose();
       // Reset state
       setTitle('');

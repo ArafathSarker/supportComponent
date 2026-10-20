@@ -17,6 +17,452 @@ export interface ProblemCategoryConfig {
 }
 
 export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
+  // 1. Hardware / Sensor / Device Problem (From System Pic)
+  {
+    category: 'Hardware / Sensor / Device Problem',
+    badge: 'Hardware / Sensor',
+    description: 'Physical IoT sensors, optical needle counters, temperature probes, vibration sensors, and telemetry hardware.',
+    dynamicFields: [
+      {
+        key: 'sensor_id',
+        label: 'Sensor / Hardware Device Tag ID',
+        type: 'text',
+        placeholder: 'e.g. SEN-OP-402, PR-TRANS-104, IOT-BOX-12',
+        required: true,
+        helpText: 'Printed on the physical sensor housing or mounting plate'
+      },
+      {
+        key: 'machine_model',
+        label: 'Attached Machine Model & Line',
+        type: 'text',
+        placeholder: 'e.g. Juki DDL-9000C (Line 04), Pegasus Overlock, Main Boiler',
+        required: true
+      },
+      {
+        key: 'led_indicator',
+        label: 'Hardware Power & LED Indicator State',
+        type: 'select',
+        options: [
+          'Steady Green (Normal Operation)',
+          'Blinking Green (Telemetry Activity Detected)',
+          'Solid Red (Hardware Fault / Sensor Tripped)',
+          'Rapid Flashing Amber (Loss of Synchronization)',
+          'Completely Dark / No Power LED'
+        ],
+        required: true
+      },
+      {
+        key: 'telemetry_reading',
+        label: 'Observed Telemetry / Analog Value',
+        type: 'text',
+        placeholder: 'e.g. 0 RPM (flatline), 7.2 Bar, NaN, Overheating 95°C',
+        required: true
+      },
+      {
+        key: 'cable_condition',
+        label: 'Sensor Harness & Cable Condition',
+        type: 'select',
+        options: [
+          'Firmly Connected & Free of Damage',
+          'Loose / Intermittent Pin Connection',
+          'Pinched by Machine Frame or Table Stand',
+          'Damaged Insulation / Oil Soaked Cable'
+        ]
+      }
+    ],
+    troubleshootingChecklist: [
+      'Cleaned optical sensor lens and reflector of fabric lint, thread debris, and machine oil',
+      'Checked that 24V DC / 5V DC auxiliary power adapter LED indicator is actively illuminated',
+      'Verified sensor alignment and mechanical gap (standard tolerance is 1.5mm - 3.0mm)',
+      'Performed a 30-second power-cycle on the sensor junction terminal box'
+    ]
+  },
+
+  // 2. Software / Firmware / App Bug (From System Pic)
+  {
+    category: 'Software / Firmware / App Bug',
+    badge: 'Software / Firmware',
+    description: 'IoT edge controller firmware, telemetry ingestion parsers, tablet application bugs, and MQTT exceptions.',
+    dynamicFields: [
+      {
+        key: 'app_version',
+        label: 'App Build / Edge Firmware Version',
+        type: 'text',
+        placeholder: 'e.g. v3.4.2-firmware, Android Tablet v2.1.0',
+        required: true
+      },
+      {
+        key: 'subsystem_affected',
+        label: 'Affected Software Subsystem',
+        type: 'select',
+        options: [
+          'Edge Gateway Firmware Data Collector',
+          'MQTT Telemetry Message Broker',
+          'Production Logging Tablet App',
+          'Real-time Analytics Ingestion Engine',
+          'Database Sync Worker'
+        ],
+        required: true
+      },
+      {
+        key: 'error_code_log',
+        label: 'Error Code or Console / Log Snippet',
+        type: 'text',
+        placeholder: 'e.g. ERR_MQTT_CONN_LOST, Code 500 JSON parse exception'
+      },
+      {
+        key: 'reproducibility',
+        label: 'Bug Frequency & Behavior',
+        type: 'select',
+        options: [
+          'Consistently Reproducible (Always Occurs)',
+          'Intermittent / Random During Peak Shifts',
+          'Occurs Only After Machine Power Cycle',
+          'Occurs When Multiple Operators Log In Simultaneously'
+        ]
+      }
+    ],
+    troubleshootingChecklist: [
+      'Checked system event logs or tablet crash dialog for exception error codes',
+      'Verified edge controller is running certified stable firmware release',
+      'Cleared local application cache and restarted the logging application',
+      'Tested service connectivity to MQTT broker endpoint'
+    ]
+  },
+
+  // 3. Network / Connectivity Issue (From System Pic)
+  {
+    category: 'Network / Connectivity Issue',
+    badge: 'Network / Gateway',
+    description: 'Floor LoRaWAN concentrators, industrial PoE switches, factory Wi-Fi mesh drops, and 4G modem links.',
+    dynamicFields: [
+      {
+        key: 'gateway_mac',
+        label: 'Gateway Identifier / MAC Address',
+        type: 'text',
+        placeholder: 'e.g. GW-SEWING-FL2-NORTH, B8:27:EB:D3:5F:11',
+        required: true,
+        helpText: 'Labeled on top of the industrial DIN-rail gateway enclosure'
+      },
+      {
+        key: 'connection_type',
+        label: 'Upstream Network Physical Interface',
+        type: 'select',
+        options: [
+          'Industrial PoE Ethernet (RJ-45)',
+          'LoRaWAN 868 / 915 MHz Sub-GHz Concentrator',
+          'Factory Wi-Fi (2.4 / 5 GHz Industrial Mesh)',
+          '4G LTE Industrial Cellular SIM Router',
+          'RS-485 Modbus RTU Serial Daisy-Chain'
+        ],
+        required: true
+      },
+      {
+        key: 'signal_rssi',
+        label: 'Signal Strength / Connection Status',
+        type: 'select',
+        options: [
+          'Total Disconnect (100% Packet Loss)',
+          'Weak Signal / High Jitter (RSSI < -90 dBm)',
+          'Intermittent Dropouts Every Few Minutes',
+          'DNS / Subnet Routing Failure'
+        ],
+        required: true
+      },
+      {
+        key: 'affected_zone',
+        label: 'Affected Factory Floor Zone',
+        type: 'text',
+        placeholder: 'e.g. Floor 2 Sewing Lines 01-08, Boiler Basement'
+      }
+    ],
+    troubleshootingChecklist: [
+      'Verified physical Ethernet RJ-45 PoE link LED lights are flashing green/amber',
+      'Confirmed external LoRaWAN / Wi-Fi antenna is upright and firmly screwed on',
+      'Power-cycled the industrial gateway or PoE power injector for 60 seconds',
+      'Verified factory floor LAN switch port and upstream gateway route are online'
+    ]
+  },
+
+  // 4. Data / Export / Reporting Issue (From System Pic)
+  {
+    category: 'Data / Export / Reporting Issue',
+    badge: 'Data / Reporting',
+    description: 'Missing stitch count logs, production analytics discrepancies, CSV/Excel export failures, and OEE reports.',
+    dynamicFields: [
+      {
+        key: 'report_type',
+        label: 'Target Report / Analytics View',
+        type: 'select',
+        options: [
+          'Daily Floor Production & Piece-Rate Summary',
+          'Machine Uptime & Downtime OEE Log',
+          'Stitch Telemetry & Cycle Time Raw Export',
+          'Steam / Energy Consumption Trend Report',
+          'Operator Efficiency & Performance Matrix'
+        ],
+        required: true
+      },
+      {
+        key: 'export_format',
+        label: 'Export Format Affected',
+        type: 'select',
+        options: [
+          'Microsoft Excel (.xlsx)',
+          'Comma-Separated Values (.csv)',
+          'PDF Production Report',
+          'Live REST API / Webhook Payload'
+        ],
+        required: true
+      },
+      {
+        key: 'date_range',
+        label: 'Affected Date Range',
+        type: 'text',
+        placeholder: 'e.g. 2026-10-18 to 2026-10-20, Morning Shift',
+        required: true
+      },
+      {
+        key: 'data_variance',
+        label: 'Observed Data Discrepancy',
+        type: 'text',
+        placeholder: 'e.g. 2-hour data gap between 10 AM - 12 PM, Output reads 0 while machines were running'
+      }
+    ],
+    troubleshootingChecklist: [
+      'Checked if raw live telemetry is actively streaming in the dashboard before export',
+      'Verified query date range does not exceed standard 90-day archive bounds',
+      'Tested exporting data in alternate format (e.g. CSV instead of Excel)',
+      'Confirmed browser popup blocker is not suppressing file download'
+    ]
+  },
+
+  // 5. SCADA / Dashboard / Display Issue (From System Pic)
+  {
+    category: 'SCADA / Dashboard / Display Issue',
+    badge: 'SCADA / Display',
+    description: 'Floor wall monitors, SCADA mimic panels, live floor heatmaps, and overhead LED Andon displays.',
+    dynamicFields: [
+      {
+        key: 'display_terminal',
+        label: 'Display Interface / Screen Location',
+        type: 'text',
+        placeholder: 'e.g. Overhead TV Line 05, Central Control Room Monitor 2, Kiosk Tablet',
+        required: true
+      },
+      {
+        key: 'widget_element',
+        label: 'Affected SCADA / UI Element',
+        type: 'select',
+        options: [
+          'Live Sewing Line Floor Heatmap',
+          'Boiler & Compressor Pressure Gauge Mimic',
+          'Real-time Hourly Target vs Actual Gauge',
+          'Real-time Machine Status Grid (Red/Yellow/Green)',
+          'Top Alarm Notification Banner'
+        ],
+        required: true
+      },
+      {
+        key: 'screen_state',
+        label: 'Screen Anomaly Observed',
+        type: 'select',
+        options: [
+          'Frozen / Telemetry Stale (Timestamp Not Updating)',
+          'White / Blank Screen or Browser Error 502',
+          'WebSocket Reconnecting Spinner Loop',
+          'Values Displaying as NaN or Null'
+        ],
+        required: true
+      }
+    ],
+    troubleshootingChecklist: [
+      'Verified browser WebSocket status indicator in top-right indicates "Connected"',
+      'Performed a hard page reload (Ctrl + Shift + R) on the display computer',
+      'Inspected HDMI video cable and power adapter to the display micro-PC',
+      'Confirmed SCADA WebSocket server endpoint is accessible from display terminal'
+    ]
+  },
+
+  // 6. User Account / Access / Permission (From System Pic)
+  {
+    category: 'User Account / Access / Permission',
+    badge: 'Access / Security',
+    description: 'Supervisor logins, operator RFID badge authorization, floor supervisor permissions, and role provisioning.',
+    dynamicFields: [
+      {
+        key: 'user_identity',
+        label: 'Target User Email / Employee ID / Badge ID',
+        type: 'text',
+        placeholder: 'e.g. arafath@csismart.com, EMP-4019, RFID #88129',
+        required: true
+      },
+      {
+        key: 'role_requested',
+        label: 'Required Permission Role',
+        type: 'select',
+        options: [
+          'Floor Supervisor (Line Overrides & Shift Sign-off)',
+          'Maintenance Engineer (Sensor Calibration & Diagnostics)',
+          'Production Viewer (Read-only Floor Analytics)',
+          'Company Administrator (Full Tenant Admin)',
+          'Line Operator (Barcode & Bundle Input)'
+        ],
+        required: true
+      },
+      {
+        key: 'access_error',
+        label: 'Observed Access Error Message',
+        type: 'select',
+        options: [
+          '403 Forbidden / Insufficient Privileges',
+          'Invalid Username or Password (Lockout)',
+          'RFID Badge Scan Unrecognized',
+          'Session Expired Immediately on Login'
+        ]
+      }
+    ],
+    troubleshootingChecklist: [
+      'Verified correct spelling of user email address and employee code',
+      'Confirmed user account is marked active in company user registry',
+      'Checked if password reset link was received in registered inbox',
+      'Verified user is accessing system from authorized company network IP'
+    ]
+  },
+
+  // 7. Billing / Subscription / License (From System Pic)
+  {
+    category: 'Billing / Subscription / License',
+    badge: 'Billing / License',
+    description: 'IoT device license renewals, cloud telemetry tiers, gateway quota expansion, and subscription invoices.',
+    dynamicFields: [
+      {
+        key: 'license_ref',
+        label: 'License Key / Subscription Reference',
+        type: 'text',
+        placeholder: 'e.g. LIC-CSI-GARMENT-2026, PO-10492',
+        required: true
+      },
+      {
+        key: 'device_tier',
+        label: 'Licensed Device Capacity Tier',
+        type: 'select',
+        options: [
+          'Tier 1 (Up to 50 Machines / 2 Gateways)',
+          'Tier 2 (Up to 150 Machines / 5 Gateways)',
+          'Tier 3 (Up to 500 Machines / Enterprise Factory)',
+          'Unlimited Multi-Floor Enterprise SLA'
+        ],
+        required: true
+      },
+      {
+        key: 'billing_inquiry',
+        label: 'Nature of Billing Request',
+        type: 'select',
+        options: [
+          'Extend Active Subscription Period',
+          'Add Additional Machine Sensor Licenses',
+          'Request Official Commercial Invoice / VAT Receipt',
+          'License Key Activation / Expiration Warning'
+        ],
+        required: true
+      }
+    ],
+    troubleshootingChecklist: [
+      'Checked current active machine count against licensed quota',
+      'Reviewed subscription expiration date on billing dashboard',
+      'Confirmed official corporate finance contact details are updated'
+    ]
+  },
+
+  // 8. Installation / Commissioning (From System Pic)
+  {
+    category: 'Installation / Commissioning',
+    badge: 'Commissioning',
+    description: 'New garment line IoT rollout, sensor mounting on sewing machines, gateway positioning, and onboarding.',
+    dynamicFields: [
+      {
+        key: 'installation_line',
+        label: 'Factory Section / New Line Number',
+        type: 'text',
+        placeholder: 'e.g. Building 1 - New Sewing Line 17, Cutter Section C',
+        required: true
+      },
+      {
+        key: 'equipment_count',
+        label: 'Number of Machines to Commission',
+        type: 'text',
+        placeholder: 'e.g. 28 Juki Overlock Machines, 2 Gateways',
+        required: true
+      },
+      {
+        key: 'target_golive_date',
+        label: 'Target Commissioning / Go-Live Date',
+        type: 'text',
+        placeholder: 'e.g. 2026-11-05',
+        required: true
+      },
+      {
+        key: 'installation_stage',
+        label: 'Current Installation Stage',
+        type: 'select',
+        options: [
+          'Pre-Installation Site Assessment & Power Drop Verification',
+          'Physical Sensor Bracket Mounting on Sewing Stands',
+          'Gateway Network Cable Termination & Uplink Test',
+          'Telemetry Calibration & Operator Training Stage'
+        ],
+        required: true
+      }
+    ],
+    troubleshootingChecklist: [
+      'Verified factory floor power drops (24V DC / 220V AC) are pre-wired and tested',
+      'Confirmed network cable drop (PoE RJ-45) is installed at gateway mounting point',
+      'Inspected sensor bracket clearance with sewing machine mechanical moving parts',
+      'Prepared machine asset serial number list for digital twin registration'
+    ]
+  },
+
+  // 9. Other / General Enquiry (From System Pic)
+  {
+    category: 'Other / General Enquiry',
+    badge: 'General Enquiry',
+    description: 'Custom IoT telemetry inquiries, sensor integration consultation, operator training, and general support.',
+    dynamicFields: [
+      {
+        key: 'enquiry_topic',
+        label: 'Enquiry Topic',
+        type: 'text',
+        placeholder: 'e.g. Third-party sensor integration, Custom ERP API sync',
+        required: true
+      },
+      {
+        key: 'contact_person',
+        label: 'Floor Contact Person & Phone',
+        type: 'text',
+        placeholder: 'e.g. Mr. Rafiq (Factory Maintenance Lead) - +880 1700-000000',
+        required: true
+      },
+      {
+        key: 'preferred_channel',
+        label: 'Preferred Response / Assistance Method',
+        type: 'select',
+        options: [
+          'Support Ticket Live Chat',
+          'On-Site Field Engineer Dispatch',
+          'Remote Video Conference & Screen Sharing',
+          'Direct Phone Consultation'
+        ]
+      }
+    ],
+    troubleshootingChecklist: [
+      'Reviewed system user guides and troubleshooting documentation',
+      'Verified contact phone number and factory location details',
+      'Compiled specific requirements or diagnostic notes for support team'
+    ]
+  },
+
+  // 10. Specialized: Sewing Machine IoT Tracker & Needle Sensor
   {
     category: 'Sewing Machine IoT Tracker & Needle Sensor',
     badge: 'Hardware / Sensor',
@@ -69,6 +515,8 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
       'Conducted a 15-second power-cycle on the sewing machine IoT junction box'
     ]
   },
+
+  // 11. Specialized: Factory Floor LoRaWAN / WiFi Edge Gateway
   {
     category: 'Factory Floor LoRaWAN / WiFi Edge Gateway',
     badge: 'Network / Gateway',
@@ -80,7 +528,7 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         type: 'text',
         placeholder: 'e.g. GW-SEWING-FL2-NORTH, B8:27:EB:D3:5F',
         required: true,
-        helpText: 'Labeled on the top of the industrial DIN-rail gateway enclosure'
+        helpText: 'Labeled on top of the industrial DIN-rail gateway enclosure'
       },
       {
         key: 'connectivity_type',
@@ -121,6 +569,8 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
       'Pressed the soft reboot switch or cycled AC breaker for the gateway circuit'
     ]
   },
+
+  // 12. Specialized: Steam Boiler, Steam Iron & Compressor Pressure IoT
   {
     category: 'Steam Boiler, Steam Iron & Compressor Pressure IoT',
     badge: 'Steam / Pneumatics',
@@ -167,6 +617,8 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
       'Verified compressor air dryer dewpoint and condensate auto-drain are functioning'
     ]
   },
+
+  // 13. Specialized: RFID & Barcode Garment Bundle Tracking Terminal
   {
     category: 'RFID & Barcode Garment Bundle Tracking Terminal',
     badge: 'WIP / Bundle Tracking',
@@ -211,6 +663,8 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
       'Restarted the Garment Production Tracking tablet application'
     ]
   },
+
+  // 14. Specialized: Fabric Spreading & CNC Cutting Machine IoT
   {
     category: 'Fabric Spreading & CNC Cutting Machine IoT',
     badge: 'Cutting Automation',
@@ -249,68 +703,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
       'Confirmed all safety light curtains and emergency stop push-buttons are released',
       'Verified 3-phase industrial power supply voltage meters are balanced',
       'Checked CNC servo drive display for thermal warning or overcurrent trip'
-    ]
-  },
-  {
-    category: 'Software / Firmware / Analytics Dashboard Issue',
-    badge: 'Software / Cloud',
-    description: 'Garment floor efficiency metrics, piece-rate calculation, line balancing charts, and cloud sync.',
-    dynamicFields: [
-      {
-        key: 'app_version',
-        label: 'Software / Dashboard Version',
-        type: 'text',
-        placeholder: 'e.g. v3.2.0-iot, Build #20261014'
-      },
-      {
-        key: 'device_browser',
-        label: 'Operating Environment',
-        type: 'text',
-        placeholder: 'e.g. Chrome on Industrial Tablet, Control Room PC'
-      },
-      {
-        key: 'data_anomaly',
-        label: 'Observed Telemetry Bug',
-        type: 'select',
-        options: [
-          'Line Efficiency Chart Frozen / Not Updating',
-          'Operator Piece Count Not Incrementing',
-          'Unrealistic Telemetry Spikes (99999 or NaN)',
-          'Data Synchronization Lag Exceeds 30 Minutes'
-        ],
-        required: true
-      }
-    ],
-    troubleshootingChecklist: [
-      'Performed hard browser reload (Ctrl + Shift + R) to refresh cached frontend assets',
-      'Verified the API Health status icon in top bar indicates "Online" (Green)',
-      'Tested accessing the dashboard from another supervisor terminal or mobile device',
-      'Confirmed the active operator has valid supervisor permissions assigned'
-    ]
-  },
-  {
-    category: 'Other / General Factory IoT Issue',
-    badge: 'General IoT',
-    description: 'Custom IoT telemetry, auxiliary factory sensors, energy meters, and general requests.',
-    dynamicFields: [
-      {
-        key: 'device_identifier',
-        label: 'Equipment or Sensor Identifier',
-        type: 'text',
-        placeholder: 'e.g. ENERGY-METER-PANEL-3, TEMP-SENSOR-01',
-        required: true
-      },
-      {
-        key: 'symptoms',
-        label: 'Primary Symptom Observed',
-        type: 'text',
-        placeholder: 'Describe observed symptoms, error sounds, or anomalous readings'
-      }
-    ],
-    troubleshootingChecklist: [
-      'Verified physical wiring and power cable connections are tight and undamaged',
-      'Checked power supply voltage with a calibrated digital multimeter',
-      'Executed a clean 15-second power reboot on the affected equipment'
     ]
   }
 ];

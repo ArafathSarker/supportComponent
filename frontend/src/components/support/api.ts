@@ -43,6 +43,15 @@ export class SupportApiClient {
     return `${this.wsBase}/notifications`;
   }
 
+  getFileUrl(path?: string): string {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('blob:') || path.startsWith('data:')) {
+      return path;
+    }
+    const origin = this.apiBase.replace(/\/api\/?$/, '');
+    return `${origin}${path.startsWith('/') ? '' : '/'}${path}`;
+  }
+
   async getStats(role: UserRole, companyName?: string): Promise<TicketStats> {
     const params = new URLSearchParams();
     if (role === 'company_admin' && companyName) {
@@ -271,6 +280,7 @@ export class SupportApiClient {
     role?: UserRole;
     companyName?: string;
     status?: string;
+    priority?: string;
     search?: string;
   }): Promise<VisitingReport[]> {
     const params = new URLSearchParams();
@@ -279,6 +289,7 @@ export class SupportApiClient {
       params.append('company_name', options.companyName);
     }
     if (options.status && options.status !== 'All') params.append('status', options.status);
+    if (options.priority && options.priority !== 'All') params.append('priority', options.priority);
     if (options.search) params.append('search', options.search);
 
     const res = await fetch(`${this.apiBase}/visiting/?${params.toString()}`);

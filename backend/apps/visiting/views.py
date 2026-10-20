@@ -17,9 +17,14 @@ class VisitingReportListCreateView(APIView):
     POST /api/visiting - Schedule a field visit (Solution Provider only)
     """
     def get(self, request):
-        role = request.query_params.get('role')
-        company_name = request.query_params.get('company_name')
-        queryset = VisitingReportService.list_reports(role=role, company_name=company_name)
+        filters = {
+            'role': request.query_params.get('role'),
+            'company_name': request.query_params.get('company_name'),
+            'status': request.query_params.get('status'),
+            'priority': request.query_params.get('priority'),
+            'search': request.query_params.get('search'),
+        }
+        queryset = VisitingReportService.list_reports(filters=filters)
         serializer = VisitingReportSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

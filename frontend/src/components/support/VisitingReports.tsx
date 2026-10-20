@@ -9,7 +9,8 @@ import {
   RefreshCw, 
   ShieldCheck, 
   FileCheck2,
-  Clock
+  LayoutList,
+  LayoutGrid
 } from 'lucide-react';
 import type { VisitingReport, CurrentUser } from './types';
 import { api } from './api';
@@ -25,6 +26,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [selectedVisitForAck, setSelectedVisitForAck] = useState<VisitingReport | null>(null);
@@ -106,7 +108,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && loadReports()}
-                className="bg-[#0b1120] border border-[#1f293d] text-gray-100 pl-9 pr-3 py-2 rounded-lg text-xs w-60 focus:outline-none focus:border-blue-500"
+                className="bg-[#0b1120] border border-[#1f293d] text-gray-100 pl-9 pr-3 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -132,6 +134,34 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
               <RefreshCw size={14} />
             </button>
 
+            {/* View Mode Toggle: Grid or List */}
+            <div className="flex items-center bg-[#0b1120] border border-[#1f293d] rounded-lg p-0.5 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                title="View as List"
+                className={`p-1.5 rounded-md text-xs transition-all ${
+                  viewMode === 'list'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/40'
+                }`}
+              >
+                <LayoutList size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                title="View as Grid"
+                className={`p-1.5 rounded-md text-xs transition-all ${
+                  viewMode === 'grid'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/40'
+                }`}
+              >
+                <LayoutGrid size={14} />
+              </button>
+            </div>
+
             {/* Super Admin Dispatch Visit Button */}
             {isSuperAdmin && (
               <button
@@ -146,128 +176,226 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
           </div>
         </div>
 
-        {/* Visiting Cards Grid */}
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {loading && reports.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-gray-400 text-xs">
-              Loading visiting logs...
-            </div>
-          ) : reports.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-gray-500">
-              <div className="flex flex-col items-center justify-center space-y-2">
-                <FileCheck2 size={32} />
-                <span className="text-xs">No visiting reports found.</span>
+        {/* Content Area: Grid View or List View */}
+        {viewMode === 'grid' ? (
+          /* Cards Grid View */
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {loading && reports.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-gray-400 text-xs">
+                Loading visiting logs...
               </div>
-            </div>
-          ) : (
-            reports.map((report) => (
-              <div
-                key={report.id}
-                className="bg-[#0f172a] border border-[#1f293d] hover:border-gray-700 rounded-xl p-4 flex flex-col justify-between space-y-3.5 shadow-md transition-all"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-mono text-xs font-bold text-sky-400">
-                      {report.visit_code}
-                    </span>
-                    <h3 className="text-sm font-semibold text-white mt-0.5">
-                      {report.target_system}
-                    </h3>
-                  </div>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                      report.status === 'Completed'
-                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                        : report.status === 'Acknowledged'
-                        ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
-                        : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-                    }`}
-                  >
-                    {report.status}
-                  </span>
+            ) : reports.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-gray-500">
+                <div className="flex flex-col items-center justify-center space-y-2">
+                  <FileCheck2 size={32} />
+                  <span className="text-xs">No visiting reports found.</span>
                 </div>
-
-                {/* Details */}
-                <div className="space-y-1.5 text-xs text-gray-300">
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <User size={13} className="text-gray-500 shrink-0" />
-                    <span><strong>Engineers:</strong> {report.visiting_engineers}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Calendar size={13} className="text-gray-500 shrink-0" />
-                    <span><strong>Scheduled:</strong> {report.scheduled_date} ({report.estimated_duration})</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <MapPin size={13} className="text-gray-500 shrink-0" />
-                    <span><strong>Company:</strong> {report.company_name}</span>
-                  </div>
-                </div>
-
-                {/* Purpose */}
-                <div className="p-2.5 bg-[#0b1120] border border-[#1f293d] rounded-lg text-xs text-gray-300 leading-relaxed">
-                  <span className="text-gray-400 font-semibold block text-[11px] uppercase tracking-wider mb-0.5">
-                    Purpose
-                  </span>
-                  {report.purpose}
-                </div>
-
-                {/* Acknowledgement Status Box */}
-                {report.acknowledged_at && (
-                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-lg text-xs text-emerald-300 space-y-1">
-                    <div className="flex items-center gap-1.5 font-semibold text-emerald-400">
-                      <CheckCircle2 size={14} />
-                      <span>Acknowledged by {report.acknowledged_by}</span>
+              </div>
+            ) : (
+              reports.map((report) => (
+                <div
+                  key={report.id}
+                  className="bg-[#0f172a] border border-[#1f293d] hover:border-gray-700 rounded-xl p-4 flex flex-col justify-between space-y-3.5 shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-xs font-bold text-sky-400">
+                        {report.visit_code}
+                      </span>
+                      <h3 className="text-sm font-semibold text-white mt-0.5">
+                        {report.target_system}
+                      </h3>
                     </div>
-                    {report.company_acknowledgement_notes && (
-                      <p className="text-[11px] text-gray-300 italic">
-                        "{report.company_acknowledgement_notes}"
-                      </p>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                        report.status === 'Completed'
+                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                          : report.status === 'Acknowledged'
+                          ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                          : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
+                      }`}
+                    >
+                      {report.status}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs text-gray-300">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <User size={13} className="text-gray-500 shrink-0" />
+                      <span><strong>Engineers:</strong> {report.visiting_engineers}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Calendar size={13} className="text-gray-500 shrink-0" />
+                      <span><strong>Scheduled:</strong> {report.scheduled_date} ({report.estimated_duration})</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <MapPin size={13} className="text-gray-500 shrink-0" />
+                      <span><strong>Company:</strong> {report.company_name}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-[#0b1120] border border-[#1f293d] rounded-lg text-xs text-gray-300 leading-relaxed">
+                    <span className="text-gray-400 font-semibold block text-[11px] uppercase tracking-wider mb-0.5">
+                      Purpose
+                    </span>
+                    {report.purpose}
+                  </div>
+
+                  {report.acknowledged_at && (
+                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-lg text-xs text-emerald-300 space-y-1">
+                      <div className="flex items-center gap-1.5 font-semibold text-emerald-400">
+                        <CheckCircle2 size={14} />
+                        <span>Acknowledged by {report.acknowledged_by}</span>
+                      </div>
+                      {report.company_acknowledgement_notes && (
+                        <p className="text-[11px] text-gray-300 italic">
+                          "{report.company_acknowledgement_notes}"
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {report.service_summary && (
+                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-lg text-xs text-gray-200 space-y-1">
+                      <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider block">
+                        Post-Visit Service Log:
+                      </span>
+                      <p className="text-xs leading-relaxed">{report.service_summary}</p>
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#1f293d]">
+                    {isCompanyAdmin && report.status === 'Pending Acknowledgement' && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVisitForAck(report)}
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md transition-colors flex items-center gap-1.5"
+                      >
+                        <ShieldCheck size={14} />
+                        Acknowledge Visit
+                      </button>
+                    )}
+
+                    {isSuperAdmin && report.status === 'Acknowledged' && (
+                      <button
+                        type="button"
+                        onClick={() => setCompleteModalVisit(report)}
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-colors flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 size={14} />
+                        Log Service Completion
+                      </button>
                     )}
                   </div>
-                )}
-
-                {/* Service summary if completed */}
-                {report.service_summary && (
-                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-lg text-xs text-gray-200 space-y-1">
-                    <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider block">
-                      Post-Visit Service Log:
-                    </span>
-                    <p className="text-xs leading-relaxed">{report.service_summary}</p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#1f293d]">
-                  {/* Company Admin Acknowledge Action */}
-                  {isCompanyAdmin && report.status === 'Pending Acknowledgement' && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedVisitForAck(report)}
-                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md transition-colors flex items-center gap-1.5"
-                    >
-                      <ShieldCheck size={14} />
-                      Acknowledge Visit
-                    </button>
-                  )}
-
-                  {/* Super Admin Complete Action */}
-                  {isSuperAdmin && report.status === 'Acknowledged' && (
-                    <button
-                      type="button"
-                      onClick={() => setCompleteModalVisit(report)}
-                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-colors flex items-center gap-1.5"
-                    >
-                      <CheckCircle2 size={14} />
-                      Log Service Completion
-                    </button>
-                  )}
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
+        ) : (
+          /* Table List View */
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left text-xs text-gray-200 border-collapse">
+              <thead>
+                <tr className="bg-[#0d1527] border-b border-[#1f293d] text-gray-400 font-semibold tracking-wider">
+                  <th className="py-3 px-4">Visit Ref</th>
+                  <th className="py-3 px-4">Target System</th>
+                  <th className="py-3 px-4">Company</th>
+                  <th className="py-3 px-4">Visiting Engineers</th>
+                  <th className="py-3 px-4">Scheduled Date</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1f293d]">
+                {loading && reports.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-10 text-gray-400">
+                      Loading visiting logs...
+                    </td>
+                  </tr>
+                ) : reports.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12 text-gray-500">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <FileCheck2 size={28} />
+                        <span>No visiting reports found.</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  reports.map((report) => (
+                    <tr key={report.id} className="hover:bg-gray-800/40 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-sky-400">
+                        {report.visit_code}
+                      </td>
+                      <td className="py-3.5 px-4 text-white font-medium">
+                        {report.target_system}
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-300">
+                        {report.company_name}
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-400">
+                        {report.visiting_engineers}
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-300 whitespace-nowrap">
+                        {report.scheduled_date}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                            report.status === 'Completed'
+                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                              : report.status === 'Acknowledged'
+                              ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                              : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
+                          }`}
+                        >
+                          {report.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        {isCompanyAdmin && report.status === 'Pending Acknowledgement' && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedVisitForAck(report)}
+                            className="px-3 py-1 rounded-md text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white border border-emerald-500/20 transition-all inline-flex items-center gap-1"
+                          >
+                            <ShieldCheck size={12} />
+                            Acknowledge
+                          </button>
+                        )}
+
+                        {isSuperAdmin && report.status === 'Acknowledged' && (
+                          <button
+                            type="button"
+                            onClick={() => setCompleteModalVisit(report)}
+                            className="px-3 py-1 rounded-md text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-600 hover:text-white border border-blue-500/20 transition-all inline-flex items-center gap-1"
+                          >
+                            <CheckCircle2 size={12} />
+                            Complete
+                          </button>
+                        )}
+
+                        {(report.status === 'Completed' || (isCompanyAdmin && report.status === 'Acknowledged')) && (
+                          <span className="text-[11px] text-gray-500 italic">
+                            {report.status === 'Completed' ? 'Logged' : 'Confirmed'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Footer info */}
+        <div className="p-4 border-t border-[#1f293d] flex items-center justify-between text-xs text-gray-400">
+          <span>Showing {reports.length} report(s) ({viewMode} view)</span>
+          <span>Status: All active</span>
         </div>
       </div>
 

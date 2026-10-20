@@ -1,15 +1,33 @@
-import type { Ticket, TicketStats, TicketMessage, UserRole } from './types';
+import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport } from './types';
 
-const DEFAULT_API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-const DEFAULT_WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+const getDefaultApiBase = (): string => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined') {
+    if (window.location.port !== '5173') {
+      return `${window.location.origin}/api`;
+    }
+  }
+  return 'http://localhost:8000/api';
+};
+
+const getDefaultWsBase = (): string => {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    if (window.location.port !== '5173') {
+      return `${protocol}//${window.location.host}/ws`;
+    }
+  }
+  return 'ws://localhost:8000/ws';
+};
 
 export class SupportApiClient {
   private apiBase: string;
   private wsBase: string;
 
   constructor(apiBase?: string, wsBase?: string) {
-    this.apiBase = apiBase || DEFAULT_API_BASE;
-    this.wsBase = wsBase || DEFAULT_WS_BASE;
+    this.apiBase = apiBase || getDefaultApiBase();
+    this.wsBase = wsBase || getDefaultWsBase();
   }
 
   setUrls(apiBase: string, wsBase: string) {
@@ -178,6 +196,89 @@ export class SupportApiClient {
       body: formData,
     });
     if (!res.ok) throw new Error('Upload failed');
+    return res.json();
+  }
+
+  // Visiting Reports API methods
+  async getVisitingReports(options: {
+    role?: UserRole;
+    companyName?: string;
+    status?: string;
+    search?: string;
+  }): Promise<VisitingReport[]> {
+    const params = new URLSearchParams();
+    if (options.role) params.append('role', options.role);
+    if (options.companyName && options.role === 'company_admin') {
+      params.append('company_name', options.companyName);
+    }
+    if (options.status && options.status !== 'All') params.append('status', options.status);
+    if (options.search) params.append('search', options.search);
+
+    const res = await fetch(`${this.apiBase}/visiting?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch visiting reports');
+    return res.json();
+  }
+
+  async createVisitingReport(payload: {
+    company_name: string;
+    target_system: string;
+    visiting_engineers: string;
+    purpose: string;
+    scheduled_date: string;
+    estimated_duration?: string;
+    entry_requirements?: string;
+    super_admin_notes?: string;
+    ticket_id?: string;
+  }): Promise<VisitingReport> {
+    const res = await fetch(`${this.apiBase}/visiting`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to create visiting report');
+    }
+    return res.json();
+  }
+
+  async acknowledgeVisit(
+    visitId: string,
+    acknowledgedBy: string,
+    notes?: string
+  ): Promise<VisitingReport> {
+    const res = await fetch(`${this.apiBase}/visiting/${visitId}/acknowledge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        acknowledged_by: acknowledgedBy,
+        company_acknowledgement_notes: notes,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to acknowledge visit');
+    }
+    return res.json();
+  }
+
+  async completeVisit(
+    visitId: string,
+    serviceSummary: string,
+    completedBy?: string
+  ): Promise<VisitingReport> {
+    const res = await fetch(`${this.apiBase}/visiting/${visitId}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_summary: serviceSummary,
+        completed_by: completedBy,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to complete visit');
+    }
     return res.json();
   }
 }

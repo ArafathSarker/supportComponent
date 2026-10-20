@@ -22,7 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-gray-500">Dashboard</span>
+          <span className="text-gray-400 font-medium">Support</span>
           <ChevronRight size={13} className="text-gray-600" />
           <span className="text-gray-300 font-medium">{userName}</span>
         </div>

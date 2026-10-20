@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Shield, Wrench } from 'lucide-react';
+import { Building2, Shield, Wrench, Ticket, FileCheck2 } from 'lucide-react';
 import type { UserRole, CurrentUser, SupportTicketProps } from './types';
 import { api } from './api';
 import { SupportTickets } from './SupportTickets';
+import { VisitingReports } from './VisitingReports';
 
 export const SupportTicketModule: React.FC<SupportTicketProps> = ({
   role: initialRole,
   currentUser: initialUser,
+  activeTab: controlledTab,
+  onTabChange,
   apiUrl,
   wsUrl,
   brandName = 'CSI Smart Tech Ltd',
@@ -26,6 +29,16 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
     }
     return initialRole || 'company_admin';
   });
+
+  const [internalTab, setInternalTab] = useState<'tickets' | 'visiting'>('tickets');
+  const currentTab = controlledTab || internalTab;
+
+  const handleTabSwitch = (tab: 'tickets' | 'visiting') => {
+    setInternalTab(tab);
+    if (onTabChange) {
+      onTabChange(tab);
+    }
+  };
 
   // Sync API URL if provided
   useEffect(() => {
@@ -55,10 +68,10 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
 
   return (
     <div className={`w-full font-sans text-gray-100 ${className}`} id="support-ticket-component">
-      {/* Role Switcher Banner (Easily toggled off via showRoleSwitcher=false for production) */}
+      {/* Role Switcher Banner (Persisted in localStorage) */}
       {showRoleSwitcher && (
         <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 mb-5 bg-[#111827] border border-[#1f293d] rounded-xl shadow-md">
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-3 text-xs flex-wrap">
             <span className="text-gray-400">Current Role:</span>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border ${
               role === 'company_admin'
@@ -94,14 +107,47 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
         </div>
       )}
 
-      {/* Main Support Tickets View */}
-      <SupportTickets
-        currentUser={currentUser}
-        categories={categories}
-        systems={systems}
-        onTicketCreated={onTicketCreated}
-        onTicketClosed={onTicketClosed}
-      />
+      {/* Navigation Sub-Tabs */}
+      <div className="flex items-center gap-2 border-b border-[#1f293d] mb-6">
+        <button
+          type="button"
+          onClick={() => handleTabSwitch('tickets')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+            currentTab === 'tickets'
+              ? 'text-blue-400 border-blue-500 bg-blue-500/10 rounded-t-lg'
+              : 'text-gray-400 border-transparent hover:text-gray-200'
+          }`}
+        >
+          <Ticket size={15} />
+          <span>Support Tickets</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabSwitch('visiting')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+            currentTab === 'visiting'
+              ? 'text-blue-400 border-blue-500 bg-blue-500/10 rounded-t-lg'
+              : 'text-gray-400 border-transparent hover:text-gray-200'
+          }`}
+        >
+          <FileCheck2 size={15} />
+          <span>{role === 'company_admin' ? 'Visiting Report' : 'Visiting Log'}</span>
+        </button>
+      </div>
+
+      {/* Active Tab View */}
+      {currentTab === 'tickets' ? (
+        <SupportTickets
+          currentUser={currentUser}
+          categories={categories}
+          systems={systems}
+          onTicketCreated={onTicketCreated}
+          onTicketClosed={onTicketClosed}
+        />
+      ) : (
+        <VisitingReports currentUser={currentUser} />
+      )}
     </div>
   );
 };

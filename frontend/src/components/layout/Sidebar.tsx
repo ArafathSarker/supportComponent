@@ -1,84 +1,88 @@
 import React from 'react';
 import { 
-  LayoutDashboard, 
-  Users, 
-  KeyRound, 
-  Activity, 
-  HardDrive, 
-  FileText, 
-  LifeBuoy, 
-  Ticket 
+  Ticket, 
+  FileCheck2, 
+  Layers
 } from 'lucide-react';
 import type { UserRole } from '../support/types';
 
 interface SidebarProps {
   role: UserRole;
+  activeTab: 'tickets' | 'visiting';
+  onTabChange: (tab: 'tickets' | 'visiting') => void;
+  brandName?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = () => {
+export const Sidebar: React.FC<SidebarProps> = ({ 
+  role,
+  activeTab,
+  onTabChange,
+  brandName = 'CSI Smart Tech Ltd' 
+}) => {
   return (
     <aside className="w-60 bg-[#090e1a] border-r border-[#1a2336] flex flex-col h-screen shrink-0 hidden md:flex">
       {/* Brand Header */}
       <div className="h-14 flex items-center px-5 gap-2.5 border-b border-[#1a2336]">
         <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
-          C
+          {brandName.charAt(0)}
         </div>
-        <span className="text-[#38bdf8] font-semibold text-sm tracking-tight">
-          CSI Smart Tech Ltd
+        <span className="text-[#38bdf8] font-semibold text-sm tracking-tight truncate">
+          {brandName}
         </span>
       </div>
 
-      {/* Nav List */}
-      <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
-          <LayoutDashboard size={16} />
-          <span>Dashboard</span>
+      {/* Nav List - Focused solely on Support System */}
+      <div className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
+        <div className="px-3 pb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          Support System
         </div>
 
-        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
-          <Users size={16} />
-          <span>Users</span>
-        </div>
-
-        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
-          <KeyRound size={16} />
-          <span>Session</span>
-        </div>
-
-        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
-          <Activity size={16} />
-          <span>SCADA</span>
-        </div>
-
-        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
-          <HardDrive size={16} />
-          <span>Devices</span>
-        </div>
-
-        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
-          <FileText size={16} />
-          <span>Reports</span>
-        </div>
-
-        {/* Support Section - Focused purely on Support Tickets */}
-        <div className="pt-2">
-          <div className="flex items-center gap-3 px-3 py-2 text-[#38bdf8] bg-sky-500/10 text-xs font-semibold rounded-lg cursor-pointer">
-            <LifeBuoy size={16} className="text-[#38bdf8]" />
-            <span>Support</span>
+        {/* 1. Support Tickets Item */}
+        <div 
+          onClick={() => onTabChange('tickets')}
+          className={`flex items-center justify-between px-3.5 py-2.5 text-xs font-medium rounded-r-lg transition-all cursor-pointer ${
+            activeTab === 'tickets'
+              ? 'text-white bg-[#1e293b] border-l-2 border-[#38bdf8] shadow-sm'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/40'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <Ticket size={16} className={activeTab === 'tickets' ? 'text-[#38bdf8]' : 'text-gray-500'} />
+            <span>Support Tickets</span>
           </div>
+          {activeTab === 'tickets' && (
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          )}
+        </div>
 
-          <div className="pl-6 mt-1 space-y-0.5">
-            <div className="flex items-center gap-2.5 px-3 py-2 text-white bg-[#1e293b] border-l-2 border-[#38bdf8] text-xs font-medium rounded-r-md cursor-pointer">
-              <Ticket size={14} className="text-[#38bdf8]" />
-              <span>Tickets</span>
-            </div>
+        {/* 2. Visiting Report / Visiting Log Item */}
+        <div 
+          onClick={() => onTabChange('visiting')}
+          className={`flex items-center justify-between px-3.5 py-2.5 text-xs font-medium rounded-r-lg transition-all cursor-pointer ${
+            activeTab === 'visiting'
+              ? 'text-white bg-[#1e293b] border-l-2 border-[#38bdf8] shadow-sm'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/40'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <FileCheck2 size={16} className={activeTab === 'visiting' ? 'text-[#38bdf8]' : 'text-gray-500'} />
+            <span>{role === 'company_admin' ? 'Visiting Report' : 'Visiting Log'}</span>
           </div>
+          {activeTab === 'visiting' && (
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          )}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-[#1a2336] text-[11px] text-gray-500">
-        IoT Support Component v1.0
+      {/* Sidebar Footer */}
+      <div className="p-4 border-t border-[#1a2336] space-y-1">
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <Layers size={13} className="text-blue-400" />
+          <span className="font-medium text-gray-300">Support Component</span>
+        </div>
+        <div className="text-[11px] text-gray-500">
+          v1.0 • Plug & Play Module
+        </div>
       </div>
     </aside>
   );

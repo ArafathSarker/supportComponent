@@ -70,9 +70,39 @@ export interface TicketStats {
   closed_tickets: number;
 }
 
+export type VisitStatus = 
+  | 'Pending Acknowledgement' 
+  | 'Acknowledged' 
+  | 'Completed' 
+  | 'Cancelled';
+
+export interface VisitingReport {
+  id: string;
+  visit_code: string;
+  ticket_id?: string;
+  company_name: string;
+  target_system: string;
+  visiting_engineers: string;
+  purpose: string;
+  scheduled_date: string;
+  estimated_duration: string;
+  entry_requirements: string;
+  status: VisitStatus;
+  super_admin_notes?: string;
+  company_acknowledgement_notes?: string;
+  acknowledged_at?: string;
+  acknowledged_by?: string;
+  completed_at?: string;
+  service_summary?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SupportTicketProps {
   role?: UserRole;
   currentUser?: CurrentUser;
+  activeTab?: 'tickets' | 'visiting';
+  onTabChange?: (tab: 'tickets' | 'visiting') => void;
   apiUrl?: string;
   wsUrl?: string;
   brandName?: string;

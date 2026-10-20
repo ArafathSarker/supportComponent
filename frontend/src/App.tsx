@@ -10,6 +10,8 @@ export function App() {
     return (saved === 'super_admin' || saved === 'company_admin') ? saved : 'company_admin';
   });
 
+  const [activeTab, setActiveTab] = useState<'tickets' | 'visiting'>('tickets');
+
   const handleRoleToggle = () => {
     const newRole: UserRole = role === 'company_admin' ? 'super_admin' : 'company_admin';
     setRole(newRole);
@@ -21,8 +23,13 @@ export function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#0b0f19]">
-      {/* Sidebar (IoT Platform Layout) */}
-      <Sidebar role={role} />
+      {/* Sidebar (Tickets & Visiting Report Navigation) */}
+      <Sidebar 
+        role={role} 
+        activeTab={activeTab} 
+        onTabChange={(tab) => setActiveTab(tab)} 
+        brandName={companyName}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -35,17 +42,23 @@ export function App() {
 
         {/* Content Body */}
         <main className="flex-1 overflow-y-auto px-6 py-5">
-          {/* Breadcrumb matching the user's screenshot */}
+          {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-xs mb-5">
-            <span className="text-blue-500 hover:underline cursor-pointer">Home</span>
+            <span className="text-blue-500 hover:underline cursor-pointer" onClick={() => setActiveTab('tickets')}>
+              Support
+            </span>
             <span className="text-gray-600">/</span>
-            <span className="text-gray-400">Support Tickets</span>
+            <span className="text-gray-400">
+              {activeTab === 'tickets' ? 'Support Tickets' : (role === 'company_admin' ? 'Visiting Report' : 'Visiting Log')}
+            </span>
           </div>
 
-          {/* Dedicated Plug-and-Play Support Ticket Component */}
+          {/* Dedicated Plug-and-Play Support Module */}
           <SupportTicketModule
-            key={role}
+            key={`${role}-${activeTab}`}
             role={role}
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab)}
             currentUser={{
               id: role === 'company_admin' ? 'usr-arafath' : 'usr-admin-alex',
               name: userName,
@@ -57,7 +70,7 @@ export function App() {
             onRoleChange={(newRole) => setRole(newRole)}
           />
 
-          {/* Footer matching screenshot */}
+          {/* Footer */}
           <footer className="mt-10 pt-5 border-t border-[#1a2336] flex flex-wrap justify-between items-center text-xs text-gray-500 gap-2">
             <div>
               CSI Smart Tech &copy; 2026 All right reserved to CSI Smart Tech.

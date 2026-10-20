@@ -1,8 +1,8 @@
-# 🎫 Plug-and-Play Support Ticket Component
+# 🎫 Plug-and-Play Support & Visiting Component
 
-A modern, full-stack, modular **Support Ticket Component** designed for enterprise web applications, IoT solutions, and SCADA systems.
+A modern, full-stack, modular **Support Ticket & Factory Visiting Management Component** designed for enterprise web applications, IoT solutions, and SCADA platforms.
 
-Styled with **Tailwind CSS v3**, backed by **FastAPI (Python)**, **PostgreSQL / SQLite**, and **Real-Time WebSockets**.
+Styled with **Tailwind CSS v3**, backed by **FastAPI (Python)**, **PostgreSQL**, and **Real-Time WebSockets**.
 
 ---
 
@@ -10,12 +10,34 @@ Styled with **Tailwind CSS v3**, backed by **FastAPI (Python)**, **PostgreSQL / 
 
 - **Pure Plug-and-Play**: Copy `frontend/src/components/support` into any React / Vite / Next.js project and import `<SupportTicketModule />`.
 - **Styled with Tailwind CSS v3**: Clean, customizable utility classes with dark obsidian/navy aesthetics matching industrial dashboards.
-- **Two Roles with Enforcement**:
-  - **Company Owner / Client (`company_admin`)**: Raise support tickets, upload photos/videos, live chat via WebSocket, and *has exclusive authority to close resolved tickets* (with star rating & remarks).
-  - **Solution Provider (`super_admin`)**: Triage tickets, update status (`Under Review`, `In Progress`, `Pending Customer Close`), and live chat. *Super Admin cannot close tickets until the client closes them.*
-- **Real-Time Live Chat via WebSockets**: Instant message delivery per ticket room (`/ws/tickets/{ticket_id}`) with typing indicator, sender badges, and attachments.
-- **Search & Filters**: Search by problem summary or machine reference, filter by status and urgency.
-- **Metrics Dashboard**: Active tickets, resolved/closed tickets, and total tickets counters.
+- **Two Distinct Pages & Modules**:
+  1. **Support Tickets**:
+     - **Company Owner (`company_admin`)**: Raise support tickets with IoT machine details, upload evidence photos/videos, live chat via WebSocket, and *has exclusive authority to close resolved tickets* (with star rating & remarks).
+     - **Solution Provider (`super_admin`)**: Triage tickets, update status (`Under Review`, `In Progress`, `Pending Customer Close`), and live chat. *Super Admin cannot close tickets directly.*
+     - **Real-Time WebSocket Chat**: Instant live chat per ticket room (`/ws/tickets/{ticket_id}`) with typing indicator, sender badges, and attachments.
+  2. **Visiting Report / Visiting Log**:
+     - **Company Admin ("Visiting Report")**: View on-site engineer visit requests dispatched by the solution provider and **Acknowledge Visit** with gate pass details and escort instructions.
+     - **Super Admin ("Visiting Log")**: Schedule and dispatch factory visit requests to client facilities (specifying engineers, date, duration, PPE requirements) and log post-visit service findings upon completion.
+- **Role System**: Easily switch perspectives between Company Owner and Super Admin via the 1-click tester banner (persisted in `localStorage`).
+
+---
+
+## 🐳 Running with Docker & Docker Compose
+
+To start PostgreSQL, FastAPI backend, and Nginx frontend together:
+
+```bash
+sudo docker compose up --build -d
+```
+
+- **Frontend App (Nginx)**: [http://localhost:3000](http://localhost:3000)
+- **FastAPI API & Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **PostgreSQL Database**: Port `5432` (or `5433` if port 5432 is occupied)
+
+To stop all services:
+```bash
+sudo docker compose down
+```
 
 ---
 
@@ -63,7 +85,7 @@ export function DashboardPage() {
         brandName="CSI Smart Tech Ltd"
         apiUrl="http://localhost:8000/api"
         wsUrl="ws://localhost:8000/ws"
-        showRoleSwitcher={true} // Set false in production with real auth
+        showRoleSwitcher={true} // toggle off in production with real auth
         categories={[
           'Hardware / Sensor / Device Problem',
           'Software / Firmware / App Bug',
@@ -96,51 +118,15 @@ export function DashboardPage() {
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `role` | `'company_admin' \| 'super_admin'` | `'company_admin'` | Active role perspective |
-| `currentUser` | `CurrentUser` | Default mock user | Current logged-in user details (id, name, role, company_name) |
-| `apiUrl` | `string` | `http://localhost:8000/api` | Base URL for REST API endpoints |
-| `wsUrl` | `string` | `ws://localhost:8000/ws` | Base WebSocket URL for real-time live chat |
+| `role` | `'company_admin' \| 'super_admin'` | `'company_admin'` | Active role perspective (read from `localStorage`) |
+| `activeTab` | `'tickets' \| 'visiting'` | `'tickets'` | Controlled tab view |
+| `onTabChange` | `(tab) => void` | `undefined` | Tab change callback |
+| `currentUser` | `CurrentUser` | Default mock user | Current user details (id, name, role, company_name) |
+| `apiUrl` | `string` | Auto-detected / `/api` | Base URL for REST API |
+| `wsUrl` | `string` | Auto-detected / `/ws` | Base WebSocket URL for real-time live chat |
 | `brandName` | `string` | `'CSI Smart Tech Ltd'` | Organization or brand name displayed |
-| `showRoleSwitcher` | `boolean` | `true` | Show/hide the top 1-click role switcher banner (ideal for testing) |
+| `showRoleSwitcher` | `boolean` | `true` | Show/hide the top 1-click role switcher banner |
 | `categories` | `string[]` | Default 9 categories | Customizable list of problem categories |
 | `systems` | `string[]` | Default IoT systems | Customizable list of affected systems/solutions |
-| `className` | `string` | `''` | Custom wrapper CSS classes |
-| `onRoleChange` | `(role) => void` | `undefined` | Callback when role is changed |
 | `onTicketCreated` | `(ticket) => void` | `undefined` | Callback when a new ticket is raised |
 | `onTicketClosed` | `(ticketId) => void` | `undefined` | Callback when a ticket is closed |
-
----
-
-## 🐳 Running with Docker & Docker Compose
-
-To start PostgreSQL, the FastAPI backend, and the React frontend together:
-
-```bash
-docker compose up --build
-```
-
-- **Frontend**: [http://localhost:3000](http://localhost:3000) (or `http://localhost:5173` in local dev)
-- **FastAPI API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **PostgreSQL Database**: Port `5432`
-
----
-
-## 💻 Local Standalone Run
-
-### 1. Backend (FastAPI)
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### 2. Frontend (Vite + React + Tailwind CSS)
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Visit [http://localhost:5173](http://localhost:5173).

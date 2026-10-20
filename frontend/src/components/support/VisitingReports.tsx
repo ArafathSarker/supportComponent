@@ -1,0 +1,344 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Calendar, 
+  MapPin, 
+  User, 
+  CheckCircle2, 
+  Search, 
+  Plus, 
+  RefreshCw, 
+  ShieldCheck, 
+  FileCheck2,
+  Clock
+} from 'lucide-react';
+import type { VisitingReport, CurrentUser } from './types';
+import { api } from './api';
+import { ScheduleVisitModal } from './ScheduleVisitModal';
+import { AcknowledgeVisitModal } from './AcknowledgeVisitModal';
+
+interface VisitingReportsProps {
+  currentUser: CurrentUser;
+}
+
+export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser }) => {
+  const [reports, setReports] = useState<VisitingReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [search, setSearch] = useState('');
+
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [selectedVisitForAck, setSelectedVisitForAck] = useState<VisitingReport | null>(null);
+  const [completeModalVisit, setCompleteModalVisit] = useState<VisitingReport | null>(null);
+  const [completeSummary, setCompleteSummary] = useState('');
+  const [completing, setCompleting] = useState(false);
+
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getVisitingReports({
+        role: currentUser.role,
+        companyName: currentUser.company_name,
+        status: statusFilter,
+        search: search.trim()
+      });
+      setReports(data);
+    } catch (err) {
+      console.error('Failed to load visiting reports:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
+  }, [currentUser.role, currentUser.company_name, statusFilter]);
+
+  const handleVisitScheduled = (newVisit: VisitingReport) => {
+    setReports((prev) => [newVisit, ...prev]);
+  };
+
+  const handleVisitAcknowledged = (updated: VisitingReport) => {
+    setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+  };
+
+  const handleCompleteSubmit = async () => {
+    if (!completeModalVisit || !completeSummary.trim()) return;
+    try {
+      setCompleting(true);
+      const updated = await api.completeVisit(completeModalVisit.id, completeSummary, currentUser.name);
+      setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setCompleteModalVisit(null);
+      setCompleteSummary('');
+    } catch (err: any) {
+      alert(err.message || 'Failed to complete visit');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const isCompanyAdmin = currentUser.role === 'company_admin';
+  const isSuperAdmin = currentUser.role === 'super_admin';
+
+  return (
+    <div className="w-full">
+      {/* Main Card */}
+      <div className="bg-[#111827] border border-[#1f293d] rounded-xl overflow-hidden shadow-2xl">
+        {/* Toolbar Header */}
+        <div className="p-5 border-b border-[#1f293d] flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-white tracking-wide">
+              {isCompanyAdmin ? 'Visiting Reports & Acknowledgements' : 'Visiting Logs (Factory Field Dispatch)'}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isCompanyAdmin
+                ? 'Review and acknowledge scheduled support engineer visits to your factory facility.'
+                : 'Dispatch on-site diagnostic & maintenance visits and monitor factory acknowledgement.'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Search */}
+            <div className="relative flex items-center">
+              <Search size={15} className="absolute left-3 text-gray-500 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="search visit code or system..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && loadReports()}
+                className="bg-[#0b1120] border border-[#1f293d] text-gray-100 pl-9 pr-3 py-2 rounded-lg text-xs w-60 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-[#0b1120] border border-[#1f293d] text-gray-200 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Pending Acknowledgement">Pending Acknowledgement</option>
+              <option value="Acknowledged">Acknowledged</option>
+              <option value="Completed">Completed</option>
+            </select>
+
+            {/* Refresh */}
+            <button
+              type="button"
+              onClick={loadReports}
+              title="Refresh reports"
+              className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-[#1f293d] transition-colors"
+            >
+              <RefreshCw size={14} />
+            </button>
+
+            {/* Super Admin Dispatch Visit Button */}
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsScheduleOpen(true)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-md transition-all flex items-center gap-1.5"
+              >
+                <Plus size={15} />
+                Dispatch Factory Visit
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Visiting Cards Grid */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {loading && reports.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-gray-400 text-xs">
+              Loading visiting logs...
+            </div>
+          ) : reports.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-gray-500">
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <FileCheck2 size={32} />
+                <span className="text-xs">No visiting reports found.</span>
+              </div>
+            </div>
+          ) : (
+            reports.map((report) => (
+              <div
+                key={report.id}
+                className="bg-[#0f172a] border border-[#1f293d] hover:border-gray-700 rounded-xl p-4 flex flex-col justify-between space-y-3.5 shadow-md transition-all"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-mono text-xs font-bold text-sky-400">
+                      {report.visit_code}
+                    </span>
+                    <h3 className="text-sm font-semibold text-white mt-0.5">
+                      {report.target_system}
+                    </h3>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                      report.status === 'Completed'
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        : report.status === 'Acknowledged'
+                        ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                        : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
+                    }`}
+                  >
+                    {report.status}
+                  </span>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-1.5 text-xs text-gray-300">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <User size={13} className="text-gray-500 shrink-0" />
+                    <span><strong>Engineers:</strong> {report.visiting_engineers}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Calendar size={13} className="text-gray-500 shrink-0" />
+                    <span><strong>Scheduled:</strong> {report.scheduled_date} ({report.estimated_duration})</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <MapPin size={13} className="text-gray-500 shrink-0" />
+                    <span><strong>Company:</strong> {report.company_name}</span>
+                  </div>
+                </div>
+
+                {/* Purpose */}
+                <div className="p-2.5 bg-[#0b1120] border border-[#1f293d] rounded-lg text-xs text-gray-300 leading-relaxed">
+                  <span className="text-gray-400 font-semibold block text-[11px] uppercase tracking-wider mb-0.5">
+                    Purpose
+                  </span>
+                  {report.purpose}
+                </div>
+
+                {/* Acknowledgement Status Box */}
+                {report.acknowledged_at && (
+                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-lg text-xs text-emerald-300 space-y-1">
+                    <div className="flex items-center gap-1.5 font-semibold text-emerald-400">
+                      <CheckCircle2 size={14} />
+                      <span>Acknowledged by {report.acknowledged_by}</span>
+                    </div>
+                    {report.company_acknowledgement_notes && (
+                      <p className="text-[11px] text-gray-300 italic">
+                        "{report.company_acknowledgement_notes}"
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Service summary if completed */}
+                {report.service_summary && (
+                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-lg text-xs text-gray-200 space-y-1">
+                    <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider block">
+                      Post-Visit Service Log:
+                    </span>
+                    <p className="text-xs leading-relaxed">{report.service_summary}</p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#1f293d]">
+                  {/* Company Admin Acknowledge Action */}
+                  {isCompanyAdmin && report.status === 'Pending Acknowledgement' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVisitForAck(report)}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md transition-colors flex items-center gap-1.5"
+                    >
+                      <ShieldCheck size={14} />
+                      Acknowledge Visit
+                    </button>
+                  )}
+
+                  {/* Super Admin Complete Action */}
+                  {isSuperAdmin && report.status === 'Acknowledged' && (
+                    <button
+                      type="button"
+                      onClick={() => setCompleteModalVisit(report)}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-colors flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 size={14} />
+                      Log Service Completion
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Schedule Visit Modal */}
+      <ScheduleVisitModal
+        isOpen={isScheduleOpen}
+        onClose={() => setIsScheduleOpen(false)}
+        currentUser={currentUser}
+        onVisitScheduled={handleVisitScheduled}
+      />
+
+      {/* Acknowledge Visit Modal */}
+      <AcknowledgeVisitModal
+        visit={selectedVisitForAck}
+        isOpen={!!selectedVisitForAck}
+        onClose={() => setSelectedVisitForAck(null)}
+        currentUser={currentUser}
+        onVisitAcknowledged={handleVisitAcknowledged}
+      />
+
+      {/* Super Admin Complete Visit Modal */}
+      {completeModalVisit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn" onClick={() => setCompleteModalVisit(null)}>
+          <div className="bg-[#111827] border border-[#1f293d] rounded-xl max-w-md w-full shadow-2xl p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#1f293d] pb-3">
+              <h3 className="text-sm font-semibold text-white">
+                Log Factory Visit Completion
+              </h3>
+              <button onClick={() => setCompleteModalVisit(null)} className="text-gray-400 hover:text-white">
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-300">
+              Visit: <strong className="text-blue-400">{completeModalVisit.visit_code}</strong> - {completeModalVisit.target_system}
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-300">
+                Service Summary & Field Findings
+              </label>
+              <textarea
+                rows={4}
+                placeholder="Work done, replaced components, sensor calibration results, and machine health status..."
+                value={completeSummary}
+                onChange={(e) => setCompleteSummary(e.target.value)}
+                className="w-full bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg p-2.5 text-xs focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#1f293d]">
+              <button
+                type="button"
+                onClick={() => setCompleteModalVisit(null)}
+                className="px-3.5 py-1.5 rounded-lg text-xs text-gray-300 bg-gray-800 hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCompleteSubmit}
+                disabled={completing || !completeSummary.trim()}
+                className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md"
+              >
+                {completing ? 'Saving...' : 'Submit Service Summary'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

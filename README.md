@@ -33,7 +33,7 @@ source backend/venv/bin/activate
 python backend/manage.py migrate
 
 # Start ASGI server (HTTP + WebSockets)
-python -m daphne -b 0.0.0.0 -p 8000 support_project.asgi:application
+python -m daphne -b 0.0.0.0 -p 8000 config.asgi:application
 # or
 python backend/manage.py runserver 0.0.0.0:8000
 ```
@@ -41,7 +41,66 @@ python backend/manage.py runserver 0.0.0.0:8000
 ### Running Backend Tests:
 ```bash
 source backend/venv/bin/activate
-pytest
+pytest backend/tests/ -v
+```
+
+---
+
+## 🏛️ Clean Modular Backend Architecture
+
+```
+backend/
+├── config/                      # Project Configuration Root
+│   ├── asgi.py                  # Daphne/Channels entrypoint (HTTP + WebSockets)
+│   ├── settings.py              # Environment configuration & DB fallback
+│   ├── urls.py                  # Root URLconf (aggregates all app URLs + media)
+│   └── wsgi.py                  # WSGI entrypoint
+│
+├── apps/                        # Domain-Driven Modular Apps
+│   ├── core/                    # Infrastructure, events & code generators
+│   │   ├── events.py            # Real-time WebSocket broadcasting service
+│   │   └── utils.py             # Code generators (TCK-..., VIS-...)
+│   │
+│   ├── tickets/                 # Support Tickets Domain
+│   │   ├── models.py            # Ticket, TicketAttachment models
+│   │   ├── serializers.py       # DRF serializers (List, Detail, Update)
+│   │   ├── services.py          # TicketService (business rules, audit trails)
+│   │   ├── views.py             # Clean API views (Stats, CRUD, Status, Close, Reopen)
+│   │   ├── urls.py              # /api/tickets/
+│   │   └── admin.py             # Django Admin registration
+│   │
+│   ├── chat/                    # Real-time Chat & WebSockets Domain
+│   │   ├── consumers.py         # TicketChatConsumer, NotificationConsumer
+│   │   ├── models.py            # TicketMessage model
+│   │   ├── routing.py           # /ws/tickets/<id> and /ws/notifications
+│   │   ├── serializers.py       # Message serializers
+│   │   ├── services.py          # ChatService (dispatching & notifications)
+│   │   ├── views.py             # Message views
+│   │   └── admin.py
+│   │
+│   ├── visiting/                # Field Visiting Reports Domain
+│   │   ├── models.py            # VisitingReport model
+│   │   ├── serializers.py       # Report serializers
+│   │   ├── services.py          # VisitingReportService (Schedule, Ack, Complete)
+│   │   ├── views.py             # Visiting views
+│   │   ├── urls.py              # /api/visiting/
+│   │   └── admin.py
+│   │
+│   └── uploads/                 # File / Media Upload Domain
+│       ├── views.py             # Multi-part upload handler
+│       └── urls.py              # /api/upload
+│
+├── tests/                       # Modular Pytest Test Suite
+│   ├── conftest.py              # Shared fixtures
+│   ├── test_health.py           # API health check
+│   ├── test_tickets.py          # Ticket lifecycle & permission rules
+│   ├── test_chat.py             # Real-time chat & WebSocket messages
+│   ├── test_visiting.py         # Visiting reports workflow
+│   └── test_uploads.py          # Evidence upload tests
+│
+├── manage.py                    # Django management script
+├── Dockerfile                   # Production container definition
+└── requirements.txt             # Locked Python dependencies
 ```
 
 ---

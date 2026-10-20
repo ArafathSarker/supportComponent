@@ -2,7 +2,8 @@ import React from 'react';
 import { 
   Ticket, 
   FileCheck2, 
-  Layers
+  Layers,
+  X
 } from 'lucide-react';
 import type { UserRole } from '../support/types';
 
@@ -11,27 +12,44 @@ interface SidebarProps {
   activeTab: 'tickets' | 'visiting';
   onTabChange: (tab: 'tickets' | 'visiting') => void;
   brandName?: string;
+  isOpenMobile?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
   role,
   activeTab,
   onTabChange,
-  brandName = 'CSI Smart Tech Ltd' 
+  brandName = 'CSI Smart Tech Ltd',
+  isOpenMobile = false,
+  onCloseMobile
 }) => {
-  return (
-    <aside className="w-60 bg-[#090e1a] border-r border-[#1a2336] flex flex-col h-screen shrink-0 hidden md:flex">
+  const content = (
+    <aside className="w-64 sm:w-60 bg-[#090e1a] border-r border-[#1a2336] flex flex-col h-full shrink-0">
       {/* Brand Header */}
-      <div className="h-14 flex items-center px-5 gap-2.5 border-b border-[#1a2336]">
-        <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
-          {brandName.charAt(0)}
+      <div className="h-14 flex items-center justify-between px-5 border-b border-[#1a2336]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+            {brandName.charAt(0)}
+          </div>
+          <span className="text-[#38bdf8] font-semibold text-sm tracking-tight truncate">
+            {brandName}
+          </span>
         </div>
-        <span className="text-[#38bdf8] font-semibold text-sm tracking-tight truncate">
-          {brandName}
-        </span>
+
+        {/* Mobile close button */}
+        {onCloseMobile && (
+          <button 
+            type="button" 
+            onClick={onCloseMobile}
+            className="p-1 rounded-md text-gray-400 hover:text-white md:hidden"
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
 
-      {/* Nav List - Focused solely on Support System */}
+      {/* Nav List */}
       <div className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
         <div className="px-3 pb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
           Support System
@@ -39,7 +57,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* 1. Support Tickets Item */}
         <div 
-          onClick={() => onTabChange('tickets')}
+          onClick={() => {
+            onTabChange('tickets');
+            if (onCloseMobile) onCloseMobile();
+          }}
           className={`flex items-center justify-between px-3.5 py-2.5 text-xs font-medium rounded-r-lg transition-all cursor-pointer ${
             activeTab === 'tickets'
               ? 'text-white bg-[#1e293b] border-l-2 border-[#38bdf8] shadow-sm'
@@ -57,7 +78,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* 2. Visiting Report / Visiting Log Item */}
         <div 
-          onClick={() => onTabChange('visiting')}
+          onClick={() => {
+            onTabChange('visiting');
+            if (onCloseMobile) onCloseMobile();
+          }}
           className={`flex items-center justify-between px-3.5 py-2.5 text-xs font-medium rounded-r-lg transition-all cursor-pointer ${
             activeTab === 'visiting'
               ? 'text-white bg-[#1e293b] border-l-2 border-[#38bdf8] shadow-sm'
@@ -85,5 +109,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar (hidden on mobile, visible on md and up) */}
+      <div className="hidden md:flex h-screen">
+        {content}
+      </div>
+
+      {/* Mobile Slide-Over Drawer with Backdrop */}
+      {isOpenMobile && (
+        <div className="fixed inset-0 z-50 flex md:hidden" onClick={onCloseMobile}>
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
+
+          {/* Drawer Panel */}
+          <div className="relative flex flex-col h-full z-10 shadow-2xl animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+            {content}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

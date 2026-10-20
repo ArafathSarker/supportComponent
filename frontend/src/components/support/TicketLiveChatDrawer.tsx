@@ -9,7 +9,8 @@ import {
   Download, 
   ShieldAlert,
   Star,
-  ExternalLink
+  MessageSquare,
+  Info
 } from 'lucide-react';
 import type { Ticket, TicketMessage, CurrentUser, TicketStatus } from './types';
 import { api } from './api';
@@ -38,6 +39,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
   const [satisfaction, setSatisfaction] = useState(5);
   const [closeNotes, setCloseNotes] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [mobileDrawerTab, setMobileDrawerTab] = useState<'chat' | 'details'>('chat');
 
   const socketRef = useRef<WebSocket | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -114,7 +116,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [messages, typingUser]);
+  }, [messages, typingUser, mobileDrawerTab]);
 
   if (!isOpen || !ticket) return null;
 
@@ -243,14 +245,14 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drawer Header */}
-        <div className="px-6 py-4 bg-[#111827] border-b border-[#1f293d] flex items-center justify-between">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-mono text-sm font-bold text-blue-400">
+        <div className="px-4 sm:px-6 py-3.5 bg-[#111827] border-b border-[#1f293d] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span className="font-mono text-xs sm:text-sm font-bold text-blue-400">
               {ticket.ticket_code}
             </span>
 
             {/* Status Badge */}
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border ${
               ticket.status === 'Closed'
                 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                 : ticket.status === 'In Progress'
@@ -263,7 +265,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             </span>
 
             {/* Urgency Badge */}
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border hidden xs:inline-flex ${
               ticket.urgency === 'Critical'
                 ? 'bg-red-500/20 text-red-400 border-red-500/35 font-semibold'
                 : ticket.urgency === 'High'
@@ -272,13 +274,14 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 ? 'bg-amber-500/15 text-amber-400 border-amber-500/25'
                 : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
             }`}>
-              {ticket.urgency} Urgency
+              {ticket.urgency}
             </span>
 
             {/* Live WebSocket Beacon */}
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
-              <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'}`} />
-              {wsConnected ? 'Live Chat Online' : 'Connecting...'}
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+              <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${wsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'}`} />
+              <span className="hidden sm:inline">{wsConnected ? 'Live Chat Online' : 'Connecting...'}</span>
+              <span className="sm:hidden">{wsConnected ? 'Live' : '...'}</span>
             </div>
           </div>
 
@@ -287,14 +290,45 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
             onClick={onClose}
           >
-            <X size={20} />
+            <X size={19} />
           </button>
         </div>
 
-        {/* Drawer Layout: Split Screen */}
+        {/* Mobile Tab Switcher (< md screens): Switch between Live Chat & Ticket Details */}
+        <div className="flex md:hidden border-b border-[#1f293d] bg-[#0d1424] shrink-0">
+          <button
+            type="button"
+            onClick={() => setMobileDrawerTab('chat')}
+            className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all ${
+              mobileDrawerTab === 'chat'
+                ? 'text-blue-400 border-blue-500 bg-blue-500/10'
+                : 'text-gray-400 border-transparent hover:text-gray-200'
+            }`}
+          >
+            <MessageSquare size={14} />
+            <span>Live Chat</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileDrawerTab('details')}
+            className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all ${
+              mobileDrawerTab === 'details'
+                ? 'text-blue-400 border-blue-500 bg-blue-500/10'
+                : 'text-gray-400 border-transparent hover:text-gray-200'
+            }`}
+          >
+            <Info size={14} />
+            <span>Details & Actions</span>
+          </button>
+        </div>
+
+        {/* Drawer Layout: Split Screen on Desktop (md:), Tabbed on Mobile */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
-          {/* Left Side: Ticket Metadata & Permission Controls (5 Cols) */}
-          <div className="md:col-span-5 bg-[#0d1424] border-r border-[#1f293d] p-5 overflow-y-auto space-y-4">
+          {/* Left Side: Ticket Metadata & Permission Controls (5 Cols on Desktop) */}
+          <div className={`md:col-span-5 bg-[#0d1424] border-r border-[#1f293d] p-4 sm:p-5 overflow-y-auto space-y-4 ${
+            mobileDrawerTab === 'details' ? 'block' : 'hidden md:block'
+          }`}>
             <div>
               <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
                 Problem Title
@@ -322,29 +356,34 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               </span>
             </div>
 
-            <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                Reported By
-              </span>
-              <span className="text-xs text-gray-300">
-                {ticket.created_by_name} ({ticket.company_name})
-              </span>
-            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-0.5">
+                  Reported By
+                </span>
+                <span className="text-gray-300 truncate block">
+                  {ticket.created_by_name}
+                </span>
+                <span className="text-gray-500 text-[11px]">
+                  ({ticket.company_name})
+                </span>
+              </div>
 
-            <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                Created At
-              </span>
-              <span className="text-xs text-gray-400">
-                {new Date(ticket.created_at).toLocaleString()}
-              </span>
+              <div>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-0.5">
+                  Created At
+                </span>
+                <span className="text-gray-400">
+                  {new Date(ticket.created_at).toLocaleDateString()}
+                </span>
+              </div>
             </div>
 
             <div>
               <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
                 Problem Description
               </span>
-              <div className="p-3 bg-[#0b1120] border border-[#1f293d] rounded-lg text-xs leading-relaxed text-gray-200 whitespace-pre-wrap">
+              <div className="p-3 bg-[#0b1120] border border-[#1f293d] rounded-lg text-xs leading-relaxed text-gray-200 whitespace-pre-wrap max-h-48 overflow-y-auto">
                 {ticket.description}
               </div>
             </div>
@@ -438,10 +477,12 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             </div>
           </div>
 
-          {/* Right Side: Real-Time WebSocket Live Chat (7 Cols) */}
-          <div className="md:col-span-7 bg-[#0b0f19] flex flex-col h-full overflow-hidden">
+          {/* Right Side: Real-Time WebSocket Live Chat (7 Cols on Desktop) */}
+          <div className={`md:col-span-7 bg-[#0b0f19] flex flex-col h-full overflow-hidden ${
+            mobileDrawerTab === 'chat' ? 'flex' : 'hidden md:flex'
+          }`}>
             {/* Chat Thread */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4" ref={chatScrollRef}>
+            <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5" ref={chatScrollRef}>
               {messages.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-gray-500 text-xs space-y-2 py-12">
                   <Clock size={28} />
@@ -453,7 +494,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 if (msg.is_system_event) {
                   return (
                     <div key={msg.id} className="flex justify-center">
-                      <span className="px-3 py-1 rounded-full bg-gray-800/80 border border-[#1f293d] text-[11px] text-gray-400 text-center max-w-sm">
+                      <span className="px-3 py-1 rounded-full bg-gray-800/80 border border-[#1f293d] text-[10px] sm:text-[11px] text-gray-400 text-center max-w-sm">
                         {msg.message}
                       </span>
                     </div>
@@ -466,12 +507,12 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 return (
                   <div
                     key={msg.id}
-                    className={`flex flex-col max-w-[80%] space-y-1 ${
+                    className={`flex flex-col max-w-[85%] sm:max-w-[80%] space-y-1 ${
                       isMine ? 'ml-auto items-end' : 'mr-auto items-start'
                     }`}
                   >
                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
-                      <span>{msg.sender_name}</span>
+                      <span className="truncate max-w-[120px]">{msg.sender_name}</span>
                       <span className={`px-1.5 py-0.2 rounded text-[9px] ${
                         isSuper ? 'bg-amber-500/15 text-amber-300' : 'bg-blue-500/15 text-blue-300'
                       }`}>
@@ -480,7 +521,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                     </div>
 
                     <div
-                      className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed break-words shadow-sm ${
+                      className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs leading-relaxed break-words shadow-sm ${
                         isMine
                           ? 'bg-blue-600 text-white rounded-br-none'
                           : 'bg-[#1e293b] text-gray-100 border border-[#1f293d] rounded-bl-none'
@@ -518,7 +559,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             </div>
 
             {/* Chat Input Toolbar */}
-            <div className="p-4 bg-[#111827] border-t border-[#1f293d] flex items-end gap-2.5">
+            <div className="p-2.5 sm:p-4 bg-[#111827] border-t border-[#1f293d] flex items-end gap-2 shrink-0">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -529,14 +570,14 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach evidence file"
-                className="p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-[#1f293d] transition-colors shrink-0"
+                className="p-2 sm:p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-[#1f293d] transition-colors shrink-0"
               >
-                <Paperclip size={17} />
+                <Paperclip size={16} />
               </button>
 
               <textarea
                 rows={1}
-                placeholder="Type your message to support... (Press Enter to send)"
+                placeholder="Type your message..."
                 value={inputText}
                 onChange={(e) => {
                   setInputText(e.target.value);
@@ -544,7 +585,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 }}
                 onKeyDown={handleKeyDown}
                 disabled={ticket.status === 'Closed'}
-                className="flex-1 bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3.5 py-2.5 text-xs focus:outline-none focus:border-blue-500 resize-none max-h-24 disabled:opacity-50"
+                className="flex-1 bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:border-blue-500 resize-none max-h-24 disabled:opacity-50"
               />
 
               <button
@@ -552,9 +593,9 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 onClick={handleSendMessage}
                 disabled={ticket.status === 'Closed' || !inputText.trim()}
                 title="Send message"
-                className="p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-colors disabled:opacity-40 shrink-0"
+                className="p-2 sm:p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-colors disabled:opacity-40 shrink-0"
               >
-                <Send size={17} />
+                <Send size={16} />
               </button>
             </div>
           </div>

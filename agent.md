@@ -1,1 +1,1 @@
-in the both support ticket pages give a small icon option view as grid or list ok.
+it have to be responsive ok so that it should work properly in all devices

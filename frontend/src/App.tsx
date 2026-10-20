@@ -11,6 +11,7 @@ export function App() {
   });
 
   const [activeTab, setActiveTab] = useState<'tickets' | 'visiting'>('tickets');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleRoleToggle = () => {
     const newRole: UserRole = role === 'company_admin' ? 'super_admin' : 'company_admin';
@@ -23,32 +24,38 @@ export function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#0b0f19]">
-      {/* Sidebar (Tickets & Visiting Report Navigation) */}
+      {/* Sidebar (Responsive for Desktop & Mobile) */}
       <Sidebar 
         role={role} 
         activeTab={activeTab} 
         onTabChange={(tab) => setActiveTab(tab)} 
         brandName={companyName}
+        isOpenMobile={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Navbar */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+        {/* Navbar with Mobile Menu Trigger */}
         <Navbar
           role={role}
           onRoleToggle={handleRoleToggle}
+          onToggleMobileMenu={() => setMobileMenuOpen(true)}
           userName={userName}
         />
 
         {/* Content Body */}
-        <main className="flex-1 overflow-y-auto px-6 py-5">
+        <main className="flex-1 overflow-y-auto p-3.5 sm:p-6">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-xs mb-5">
-            <span className="text-blue-500 hover:underline cursor-pointer" onClick={() => setActiveTab('tickets')}>
+          <div className="flex items-center gap-2 text-xs mb-4 sm:mb-5">
+            <span 
+              className="text-blue-500 hover:underline cursor-pointer font-medium" 
+              onClick={() => setActiveTab('tickets')}
+            >
               Support
             </span>
             <span className="text-gray-600">/</span>
-            <span className="text-gray-400">
+            <span className="text-gray-400 truncate">
               {activeTab === 'tickets' ? 'Support Tickets' : (role === 'company_admin' ? 'Visiting Report' : 'Visiting Log')}
             </span>
           </div>
@@ -71,7 +78,7 @@ export function App() {
           />
 
           {/* Footer */}
-          <footer className="mt-10 pt-5 border-t border-[#1a2336] flex flex-wrap justify-between items-center text-xs text-gray-500 gap-2">
+          <footer className="mt-8 sm:mt-12 pt-4 border-t border-[#1a2336] flex flex-col sm:flex-row justify-between items-center text-[11px] sm:text-xs text-gray-500 gap-2 text-center sm:text-left">
             <div>
               CSI Smart Tech &copy; 2026 All right reserved to CSI Smart Tech.
             </div>

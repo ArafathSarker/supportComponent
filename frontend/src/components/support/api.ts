@@ -105,6 +105,30 @@ export class SupportApiClient {
     return res.json();
   }
 
+  async updateTicket(
+    ticketId: string,
+    payload: {
+      title?: string;
+      affected_system?: string;
+      category?: string;
+      urgency?: string;
+      description?: string;
+      updated_by_name?: string;
+      updated_by_role?: string;
+    }
+  ): Promise<Ticket> {
+    const res = await fetch(`${this.apiBase}/tickets/${ticketId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update ticket');
+    }
+    return res.json();
+  }
+
   async updateTicketStatus(
     ticketId: string,
     status: string,

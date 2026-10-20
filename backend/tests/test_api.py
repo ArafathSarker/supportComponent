@@ -16,7 +16,21 @@ def test_health_check(client):
     assert response.json()["status"] == "online"
 
 def test_ticket_flow_and_permission_rule(client):
-    # 1. Company Admin creates ticket
+    # 1. Super Admin attempts to create ticket -> MUST BE FORBIDDEN (403)!
+    super_admin_create_res = client.post("/api/tickets", json={
+        "title": "Super Admin Ticket Attempt",
+        "affected_system": "Water Flow Monitoring",
+        "category": "Hardware / Sensor / Device Problem",
+        "urgency": "Low",
+        "description": "Super admin trying to raise ticket.",
+        "company_name": "CSI Smart Tech Ltd",
+        "created_by_name": "David",
+        "created_by_role": "super_admin"
+    })
+    assert super_admin_create_res.status_code == 403
+    assert "cannot raise support tickets" in super_admin_create_res.json()["detail"]
+
+    # 1b. Company Admin creates ticket -> SUCCESS!
     ticket_payload = {
         "title": "High Vibration Warning on Water Pump WP-02",
         "affected_system": "Water Flow Monitoring",
@@ -33,6 +47,35 @@ def test_ticket_flow_and_permission_rule(client):
     ticket_id = ticket_data["id"]
     assert ticket_data["status"] == "Open"
     assert ticket_data["ticket_code"].startswith("TCK-")
+
+    # 1c. Super Admin attempts to EDIT the ticket -> MUST BE FORBIDDEN (403)!
+    super_edit_res = client.patch(
+        f"/api/tickets/{ticket_id}",
+        json={
+            "title": "Unauthorized Super Admin Edit",
+            "updated_by_role": "super_admin",
+            "updated_by_name": "David"
+        }
+    )
+    assert super_edit_res.status_code == 403
+    assert "Super Admin" in super_edit_res.json()["detail"]
+
+    # 1d. Company Admin EDITS the ticket -> SUCCESS!
+    edit_res = client.patch(
+        f"/api/tickets/{ticket_id}",
+        json={
+            "title": "High Vibration Warning on Water Pump WP-02 (Updated: Line 4)",
+            "urgency": "Critical",
+            "description": "Updated description: Vibration frequency spike observed at 120Hz.",
+            "updated_by_role": "company_admin",
+            "updated_by_name": "Arafath"
+        }
+    )
+    assert edit_res.status_code == 200
+    updated_data = edit_res.json()
+    assert updated_data["title"] == "High Vibration Warning on Water Pump WP-02 (Updated: Line 4)"
+    assert updated_data["urgency"] == "Critical"
+    assert "120Hz" in updated_data["description"]
 
     # 2. Super Admin changes status to "In Progress"
     status_update_res = client.patch(

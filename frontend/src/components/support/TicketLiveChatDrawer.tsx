@@ -10,10 +10,12 @@ import {
   ShieldAlert,
   Star,
   MessageSquare,
-  Info
+  Info,
+  Edit3
 } from 'lucide-react';
 import type { Ticket, TicketMessage, CurrentUser, TicketStatus } from './types';
 import { api } from './api';
+import { EditTicketModal } from './EditTicketModal';
 
 interface TicketLiveChatDrawerProps {
   ticketId: string | null;
@@ -36,6 +38,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
   const [wsConnected, setWsConnected] = useState(false);
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [satisfaction, setSatisfaction] = useState(5);
   const [closeNotes, setCloseNotes] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -82,6 +85,17 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
           });
         } else if (payload.type === 'status_updated') {
           setTicket((prev) => prev ? { ...prev, status: payload.status as TicketStatus } : null);
+        } else if (payload.type === 'ticket_updated') {
+          setTicket((prev) => prev ? {
+            ...prev,
+            title: payload.title ?? prev.title,
+            affected_system: payload.affected_system ?? prev.affected_system,
+            category: payload.category ?? prev.category,
+            urgency: payload.urgency ?? prev.urgency,
+            description: payload.description ?? prev.description,
+            status: payload.status ?? prev.status,
+            updated_at: payload.updated_at ?? prev.updated_at
+          } : null);
         } else if (payload.type === 'ticket_closed') {
           setTicket((prev) => prev ? { ...prev, status: 'Closed' } : null);
         } else if (payload.type === 'typing') {
@@ -330,9 +344,22 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             mobileDrawerTab === 'details' ? 'block' : 'hidden md:block'
           }`}>
             <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                Problem Title
-              </span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+                  Problem Title
+                </span>
+                {isCompanyAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 font-medium px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-all"
+                    title="Edit ticket specifications"
+                  >
+                    <Edit3 size={11} />
+                    <span>Edit</span>
+                  </button>
+                )}
+              </div>
               <h4 className="text-sm font-semibold text-white">
                 {ticket.title}
               </h4>
@@ -420,6 +447,15 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               {/* Company Admin View */}
               {isCompanyAdmin && (
                 <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="w-full py-2.5 px-4 rounded-lg text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Edit3 size={14} />
+                    Edit Ticket Details
+                  </button>
+
                   {ticket.status !== 'Closed' ? (
                     <button
                       type="button"
@@ -440,7 +476,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                     </button>
                   )}
                   <p className="text-[11px] text-gray-400 leading-tight">
-                    * Company Owner Rule: Only you can close this ticket once satisfied.
+                    * Company Owner Rule: Only you can close this ticket once satisfied, or edit specifications at any time.
                   </p>
                 </div>
               )}
@@ -668,6 +704,19 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
           </div>
         </div>
       )}
+
+      {/* Edit Ticket Modal for Company Owner */}
+      <EditTicketModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        ticket={ticket}
+        currentUser={currentUser}
+        onTicketUpdated={(updated) => {
+          setTicket(updated);
+          onTicketUpdated(updated);
+          setIsEditModalOpen(false);
+        }}
+      />
     </div>
   );
 };

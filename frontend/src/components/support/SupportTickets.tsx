@@ -8,12 +8,15 @@ import {
   LayoutGrid, 
   Cpu, 
   Clock, 
-  Tag 
+  Tag,
+  Edit3,
+  Shield
 } from 'lucide-react';
 import type { Ticket, TicketStats, CurrentUser } from './types';
 import { api } from './api';
 import { StatCards } from './StatCards';
 import { RaiseTicketModal } from './RaiseTicketModal';
+import { EditTicketModal } from './EditTicketModal';
 import { TicketLiveChatDrawer } from './TicketLiveChatDrawer';
 
 interface SupportTicketsProps {
@@ -21,6 +24,7 @@ interface SupportTicketsProps {
   categories?: string[];
   systems?: string[];
   onTicketCreated?: (ticket: Ticket) => void;
+  onTicketUpdated?: (ticket: Ticket) => void;
   onTicketClosed?: (ticketId: string) => void;
 }
 
@@ -29,6 +33,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
   categories,
   systems,
   onTicketCreated: externalTicketCreated,
+  onTicketUpdated: externalTicketUpdated,
   onTicketClosed: externalTicketClosed
 }) => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -45,6 +50,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
+  const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -113,6 +119,9 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
   const handleTicketUpdated = (updated: Ticket) => {
     setTickets((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
     loadData();
+    if (externalTicketUpdated) {
+      externalTicketUpdated(updated);
+    }
     if (updated.status === 'Closed' && externalTicketClosed) {
       externalTicketClosed(updated.id);
     }
@@ -219,15 +228,22 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
               </button>
             </div>
 
-            {/* Raise Support Ticket Button */}
-            <button
-              type="button"
-              onClick={() => setIsRaiseModalOpen(true)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-md transition-all flex items-center gap-1.5"
-            >
-              <Plus size={15} />
-              Raise Support Ticket
-            </button>
+            {/* Raise Support Ticket Button (Company Admin only; hidden for Super Admin / Solution Provider) */}
+            {currentUser.role === 'company_admin' ? (
+              <button
+                type="button"
+                onClick={() => setIsRaiseModalOpen(true)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-md transition-all flex items-center gap-1.5"
+              >
+                <Plus size={15} />
+                Raise Support Ticket
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-purple-500/10 border border-purple-500/25 text-purple-300">
+                <Shield size={13} className="text-purple-400" />
+                <span>Monitoring Available Tickets</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -260,7 +276,11 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
                     <td colSpan={8} className="text-center py-12 text-gray-500">
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <MessageSquare size={28} />
-                        <span>No tickets found. Click "Raise Support Ticket" to create one.</span>
+                        <span>
+                          {currentUser.role === 'company_admin'
+                            ? 'No tickets found. Click "Raise Support Ticket" to create one.'
+                            : 'No support tickets available for support at the moment.'}
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -321,13 +341,26 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => setActiveChatTicketId(ticket.id)}
-                          className="px-3 py-1 rounded-md text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-600 hover:text-white border border-blue-500/20 transition-all"
-                        >
-                          View
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setActiveChatTicketId(ticket.id)}
+                            className="px-2.5 py-1 rounded-md text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-600 hover:text-white border border-blue-500/20 transition-all"
+                          >
+                            View
+                          </button>
+                          {currentUser.role === 'company_admin' && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingTicket(ticket)}
+                              title="Edit support ticket specifications"
+                              className="px-2.5 py-1 rounded-md text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-600 hover:text-white border border-amber-500/20 transition-all flex items-center gap-1"
+                            >
+                              <Edit3 size={12} />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -346,7 +379,11 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
               <div className="col-span-full text-center py-12 text-gray-500">
                 <div className="flex flex-col items-center justify-center space-y-2">
                   <MessageSquare size={28} />
-                  <span className="text-xs">No tickets found matching your query.</span>
+                  <span className="text-xs">
+                    {currentUser.role === 'company_admin'
+                      ? 'No tickets found matching your query. Click "Raise Support Ticket" to create one.'
+                      : 'No support tickets available for support matching your query.'}
+                  </span>
                 </div>
               </div>
             ) : (
@@ -412,19 +449,32 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
                     </div>
                   )}
 
-                  {/* Footer: Date & View Button */}
+                  {/* Footer: Date & Action Buttons */}
                   <div className="pt-2 border-t border-[#1f293d] flex items-center justify-between text-[11px] text-gray-400">
                     <div className="flex items-center gap-1">
                       <Clock size={12} className="text-gray-500" />
                       <span>{formatDate(ticket.created_at)}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveChatTicketId(ticket.id)}
-                      className="px-3 py-1 rounded-md text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-600 hover:text-white border border-blue-500/20 transition-all"
-                    >
-                      View
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {currentUser.role === 'company_admin' && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingTicket(ticket)}
+                          title="Edit support ticket specifications"
+                          className="px-2.5 py-1 rounded-md text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-600 hover:text-white border border-amber-500/20 transition-all flex items-center gap-1"
+                        >
+                          <Edit3 size={12} />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setActiveChatTicketId(ticket.id)}
+                        className="px-3 py-1 rounded-md text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-600 hover:text-white border border-blue-500/20 transition-all"
+                      >
+                        View
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -447,6 +497,20 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
         categories={categories}
         systems={systems}
         onTicketCreated={handleTicketCreated}
+      />
+
+      {/* Edit Ticket Modal for Company Owner */}
+      <EditTicketModal
+        isOpen={!!editingTicket}
+        onClose={() => setEditingTicket(null)}
+        ticket={editingTicket}
+        currentUser={currentUser}
+        categories={categories}
+        systems={systems}
+        onTicketUpdated={(updated) => {
+          handleTicketUpdated(updated);
+          setEditingTicket(null);
+        }}
       />
 
       {/* Live WebSocket Chat Drawer */}

@@ -1,1 +1,1 @@
-it have to be responsive ok so that it should work properly in all devices
+there is a big problem if you are a solution provider means the super admin you can't add a support ticket so remove the button from that role super admin can just check is there any support ticket available for support? and from the company owner side give a option of edit so that they can edit it later ok.

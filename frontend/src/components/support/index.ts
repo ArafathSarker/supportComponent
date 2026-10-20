@@ -6,5 +6,6 @@ export * from './VisitingReports';
 export * from './ScheduleVisitModal';
 export * from './AcknowledgeVisitModal';
 export * from './RaiseTicketModal';
+export * from './EditTicketModal';
 export * from './TicketLiveChatDrawer';
 export * from './StatCards';

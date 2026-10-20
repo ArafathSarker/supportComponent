@@ -19,6 +19,7 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
   className = '',
   onRoleChange,
   onTicketCreated,
+  onTicketUpdated,
   onTicketClosed
 }) => {
   // Read role from localStorage if available, or prop, or default to company_admin
@@ -143,6 +144,7 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
           categories={categories}
           systems={systems}
           onTicketCreated={onTicketCreated}
+          onTicketUpdated={onTicketUpdated}
           onTicketClosed={onTicketClosed}
         />
       ) : (

@@ -98,6 +98,16 @@ export interface VisitingReport {
   updated_at: string;
 }
 
+export interface TicketUpdateData {
+  title?: string;
+  affected_system?: string;
+  category?: string;
+  urgency?: TicketUrgency;
+  description?: string;
+  updated_by_name?: string;
+  updated_by_role?: string;
+}
+
 export interface SupportTicketProps {
   role?: UserRole;
   currentUser?: CurrentUser;
@@ -112,5 +122,6 @@ export interface SupportTicketProps {
   className?: string;
   onRoleChange?: (newRole: UserRole) => void;
   onTicketCreated?: (ticket: Ticket) => void;
+  onTicketUpdated?: (ticket: Ticket) => void;
   onTicketClosed?: (ticketId: string) => void;
 }

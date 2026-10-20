@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models import Ticket, TicketMessage, TicketAttachment
 from app.schemas import (
     TicketCreate,
+    TicketUpdate,
     TicketResponse,
     TicketDetailResponse,
     TicketStatusUpdate,
@@ -113,6 +114,13 @@ def get_tickets(
 
 @router.post("", response_model=TicketDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_ticket(ticket_data: TicketCreate, db: Session = Depends(get_db)):
+    # Enforce rule: Solution Provider (Super Admin) CANNOT create/raise a support ticket
+    if ticket_data.created_by_role == "super_admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Solution providers (Super Admin) cannot raise support tickets. Only Company Clients/Owners can create tickets."
+        )
+
     code = generate_ticket_code(db)
     ticket = Ticket(
         ticket_code=code,
@@ -161,6 +169,99 @@ def get_ticket_detail(ticket_id: str, db: Session = Depends(get_db)):
     ).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+    return ticket
+
+@router.patch("/{ticket_id}", response_model=TicketDetailResponse)
+@router.put("/{ticket_id}", response_model=TicketDetailResponse)
+async def update_ticket(
+    ticket_id: str,
+    ticket_data: TicketUpdate,
+    db: Session = Depends(get_db)
+):
+    ticket = db.query(Ticket).filter(
+        or_(Ticket.id == ticket_id, Ticket.ticket_code == ticket_id)
+    ).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Enforce permission: Super Admin cannot edit ticket details. Only Company Admin/Owner can edit.
+    if ticket_data.updated_by_role != "company_admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Super Admin (Solution Provider) cannot edit ticket details. Only the Company Owner/Admin can edit their ticket."
+        )
+
+    changes = []
+    if ticket_data.title is not None and ticket_data.title.strip() and ticket_data.title != ticket.title:
+        changes.append(f"Title: '{ticket_data.title}'")
+        ticket.title = ticket_data.title.strip()
+
+    if ticket_data.affected_system is not None and ticket_data.affected_system != ticket.affected_system:
+        changes.append(f"System: '{ticket_data.affected_system}'")
+        ticket.affected_system = ticket_data.affected_system
+
+    if ticket_data.category is not None and ticket_data.category != ticket.category:
+        changes.append(f"Category: '{ticket_data.category}'")
+        ticket.category = ticket_data.category
+
+    if ticket_data.urgency is not None and ticket_data.urgency != ticket.urgency:
+        changes.append(f"Urgency: '{ticket_data.urgency}'")
+        ticket.urgency = ticket_data.urgency
+
+    if ticket_data.description is not None and ticket_data.description.strip() and ticket_data.description != ticket.description:
+        changes.append("Description updated")
+        ticket.description = ticket_data.description.strip()
+
+    ticket.updated_at = datetime.utcnow()
+
+    user_name = ticket_data.updated_by_name or "Company Owner"
+    log_text = f"Ticket details updated by {user_name} (Company Admin)."
+    if changes:
+        log_text += f" ({', '.join(changes)})"
+
+    sys_msg = TicketMessage(
+        ticket_id=ticket.id,
+        sender_name="System",
+        sender_role="system",
+        message=log_text,
+        is_system_event=True
+    )
+    db.add(sys_msg)
+    db.commit()
+    db.refresh(ticket)
+    db.refresh(sys_msg)
+
+    # Broadcast via WS to ticket chat room
+    msg_dict = {
+        "id": sys_msg.id,
+        "ticket_id": ticket.id,
+        "sender_name": sys_msg.sender_name,
+        "sender_role": sys_msg.sender_role,
+        "message": sys_msg.message,
+        "is_system_event": True,
+        "created_at": sys_msg.created_at.isoformat()
+    }
+    await manager.broadcast_ticket_message(ticket.id, {
+        "type": "chat_message",
+        "data": msg_dict
+    })
+
+    ticket_update_event = {
+        "type": "ticket_updated",
+        "ticket_id": ticket.id,
+        "ticket_code": ticket.ticket_code,
+        "title": ticket.title,
+        "affected_system": ticket.affected_system,
+        "category": ticket.category,
+        "urgency": ticket.urgency,
+        "description": ticket.description,
+        "status": ticket.status,
+        "updated_at": ticket.updated_at.isoformat(),
+        "updated_by_name": user_name
+    }
+    await manager.broadcast_ticket_message(ticket.id, ticket_update_event)
+    await manager.broadcast_global_event("ticket_updated", ticket_update_event)
+
     return ticket
 
 @router.patch("/{ticket_id}/status")

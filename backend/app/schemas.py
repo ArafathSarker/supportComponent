@@ -49,6 +49,15 @@ class TicketCreate(BaseModel):
     created_by_name: str = "Arafath"
     created_by_role: str = "company_admin"
 
+class TicketUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=3, max_length=255)
+    affected_system: Optional[str] = None
+    category: Optional[str] = None
+    urgency: Optional[str] = None
+    description: Optional[str] = Field(None, min_length=5)
+    updated_by_name: Optional[str] = "Arafath"
+    updated_by_role: Optional[str] = "company_admin"
+
 class TicketStatusUpdate(BaseModel):
     status: str
     updated_by_role: str

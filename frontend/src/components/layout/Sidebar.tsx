@@ -1,239 +1,83 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   LayoutDashboard, 
   Users, 
   KeyRound, 
   Activity, 
-  Cpu, 
+  HardDrive, 
   FileText, 
   LifeBuoy, 
-  ChevronDown, 
-  ChevronRight,
-  Ticket,
-  FileCheck2,
-  HardDrive
+  Ticket 
 } from 'lucide-react';
-import { UserRole } from '../support/types';
+import type { UserRole } from '../support/types';
 
 interface SidebarProps {
-  activeTab: 'tickets' | 'visiting';
-  onTabChange: (tab: 'tickets' | 'visiting') => void;
   role: UserRole;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, role }) => {
-  const [supportExpanded, setSupportExpanded] = useState(true);
-
+export const Sidebar: React.FC<SidebarProps> = () => {
   return (
-    <aside style={{
-      width: '240px',
-      background: '#090e1a',
-      borderRight: '1px solid #1a2336',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100vh',
-      flexShrink: 0
-    }}>
+    <aside className="w-60 bg-[#090e1a] border-r border-[#1a2336] flex flex-col h-screen shrink-0 hidden md:flex">
       {/* Brand Header */}
-      <div style={{
-        height: '60px',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 20px',
-        gap: '10px',
-        borderBottom: '1px solid #1a2336'
-      }}>
-        <div style={{
-          width: '28px',
-          height: '28px',
-          borderRadius: '6px',
-          background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          fontWeight: 700,
-          fontSize: '14px'
-        }}>
+      <div className="h-14 flex items-center px-5 gap-2.5 border-b border-[#1a2336]">
+        <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
           C
         </div>
-        <span style={{
-          color: '#38bdf8',
-          fontWeight: 600,
-          fontSize: '15px',
-          letterSpacing: '-0.2px'
-        }}>
+        <span className="text-[#38bdf8] font-semibold text-sm tracking-tight">
           CSI Smart Tech Ltd
         </span>
       </div>
 
       {/* Nav List */}
-      <div style={{ flex: 1, padding: '16px 10px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          color: '#94a3b8',
-          fontSize: '13.5px',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          transition: 'all 0.2s'
-        }}>
-          <LayoutDashboard size={18} />
+      <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
+          <LayoutDashboard size={16} />
           <span>Dashboard</span>
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          color: '#94a3b8',
-          fontSize: '13.5px',
-          borderRadius: '6px',
-          cursor: 'pointer'
-        }}>
-          <Users size={18} />
+        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
+          <Users size={16} />
           <span>Users</span>
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          color: '#94a3b8',
-          fontSize: '13.5px',
-          borderRadius: '6px',
-          cursor: 'pointer'
-        }}>
-          <KeyRound size={18} />
+        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
+          <KeyRound size={16} />
           <span>Session</span>
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          color: '#94a3b8',
-          fontSize: '13.5px',
-          borderRadius: '6px',
-          cursor: 'pointer'
-        }}>
-          <Activity size={18} />
+        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
+          <Activity size={16} />
           <span>SCADA</span>
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          color: '#94a3b8',
-          fontSize: '13.5px',
-          borderRadius: '6px',
-          cursor: 'pointer'
-        }}>
-          <HardDrive size={18} />
+        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
+          <HardDrive size={16} />
           <span>Devices</span>
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          color: '#94a3b8',
-          fontSize: '13.5px',
-          borderRadius: '6px',
-          cursor: 'pointer'
-        }}>
-          <FileText size={18} />
+        <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-xs rounded-lg hover:text-gray-200 hover:bg-gray-800/40 cursor-pointer transition-colors">
+          <FileText size={16} />
           <span>Reports</span>
         </div>
 
-        {/* Support Section (Active & Collapsible) */}
-        <div style={{ marginTop: '8px' }}>
-          <div
-            onClick={() => setSupportExpanded(!supportExpanded)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 14px',
-              color: '#38bdf8',
-              background: 'rgba(56, 189, 248, 0.08)',
-              fontSize: '13.5px',
-              fontWeight: 500,
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <LifeBuoy size={18} color="#38bdf8" />
-              <span>Support</span>
-            </div>
-            {supportExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+        {/* Support Section - Focused purely on Support Tickets */}
+        <div className="pt-2">
+          <div className="flex items-center gap-3 px-3 py-2 text-[#38bdf8] bg-sky-500/10 text-xs font-semibold rounded-lg cursor-pointer">
+            <LifeBuoy size={16} className="text-[#38bdf8]" />
+            <span>Support</span>
           </div>
 
-          {supportExpanded && (
-            <div style={{ paddingLeft: '28px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {/* Tickets Link */}
-              <div
-                onClick={() => onTabChange('tickets')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '8px 12px',
-                  color: activeTab === 'tickets' ? '#fff' : '#94a3b8',
-                  background: activeTab === 'tickets' ? '#1e293b' : 'transparent',
-                  borderLeft: activeTab === 'tickets' ? '2px solid #38bdf8' : '2px solid transparent',
-                  fontSize: '13px',
-                  borderRadius: '0 6px 6px 0',
-                  cursor: 'pointer',
-                  fontWeight: activeTab === 'tickets' ? 600 : 400
-                }}
-              >
-                <Ticket size={15} color={activeTab === 'tickets' ? '#38bdf8' : '#64748b'} />
-                <span>Tickets</span>
-              </div>
-
-              {/* Visiting Report Link */}
-              <div
-                onClick={() => onTabChange('visiting')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '8px 12px',
-                  color: activeTab === 'visiting' ? '#fff' : '#94a3b8',
-                  background: activeTab === 'visiting' ? '#1e293b' : 'transparent',
-                  borderLeft: activeTab === 'visiting' ? '2px solid #38bdf8' : '2px solid transparent',
-                  fontSize: '13px',
-                  borderRadius: '0 6px 6px 0',
-                  cursor: 'pointer',
-                  fontWeight: activeTab === 'visiting' ? 600 : 400
-                }}
-              >
-                <FileCheck2 size={15} color={activeTab === 'visiting' ? '#38bdf8' : '#64748b'} />
-                <span>{role === 'company_admin' ? 'Visiting Report' : 'Visiting Log'}</span>
-              </div>
+          <div className="pl-6 mt-1 space-y-0.5">
+            <div className="flex items-center gap-2.5 px-3 py-2 text-white bg-[#1e293b] border-l-2 border-[#38bdf8] text-xs font-medium rounded-r-md cursor-pointer">
+              <Ticket size={14} className="text-[#38bdf8]" />
+              <span>Tickets</span>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Sidebar Footer */}
-      <div style={{
-        padding: '14px 16px',
-        borderTop: '1px solid #1a2336',
-        fontSize: '11px',
-        color: '#64748b',
-        lineHeight: 1.4
-      }}>
+      {/* Footer */}
+      <div className="p-4 border-t border-[#1a2336] text-[11px] text-gray-500">
         IoT Support Component v1.0
       </div>
     </aside>

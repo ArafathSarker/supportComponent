@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Navbar } from './components/layout/Navbar';
-import { SupportModule } from './components/support';
-import { UserRole } from './components/support/types';
+import { SupportTicketModule } from './components/support';
+import type { UserRole } from './components/support/types';
 
 export function App() {
   const [role, setRole] = useState<UserRole>(() => {
     const saved = localStorage.getItem('support_user_role');
     return (saved === 'super_admin' || saved === 'company_admin') ? saved : 'company_admin';
   });
-
-  const [activeTab, setActiveTab] = useState<'tickets' | 'visiting'>('tickets');
 
   const handleRoleToggle = () => {
     const newRole: UserRole = role === 'company_admin' ? 'super_admin' : 'company_admin';
@@ -22,38 +20,31 @@ export function App() {
   const companyName = 'CSI Smart Tech Ltd';
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: '#0b0f19' }}>
-      {/* Sidebar */}
-      <Sidebar
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
-        role={role}
-      />
+    <div className="flex h-screen w-screen overflow-hidden bg-[#0b0f19]">
+      {/* Sidebar (IoT Platform Layout) */}
+      <Sidebar role={role} />
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Navbar */}
         <Navbar
-          activeTab={activeTab}
           role={role}
           onRoleToggle={handleRoleToggle}
           userName={userName}
         />
 
-        {/* Content Body with Breadcrumbs */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-          {/* Breadcrumb matching screenshot */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '20px' }}>
-            <span style={{ color: '#3b82f6', cursor: 'pointer' }}>Home</span>
-            <span style={{ color: '#475569' }}>/</span>
-            <span style={{ color: '#94a3b8' }}>
-              {activeTab === 'tickets' ? 'Support Tickets' : (role === 'company_admin' ? 'Visiting Report' : 'Visiting Log')}
-            </span>
+        {/* Content Body */}
+        <main className="flex-1 overflow-y-auto px-6 py-5">
+          {/* Breadcrumb matching the user's screenshot */}
+          <div className="flex items-center gap-2 text-xs mb-5">
+            <span className="text-blue-500 hover:underline cursor-pointer">Home</span>
+            <span className="text-gray-600">/</span>
+            <span className="text-gray-400">Support Tickets</span>
           </div>
 
-          {/* Plug-and-Play Support Module */}
-          <SupportModule
-            key={`${role}-${activeTab}`}
+          {/* Dedicated Plug-and-Play Support Ticket Component */}
+          <SupportTicketModule
+            key={role}
             role={role}
             currentUser={{
               id: role === 'company_admin' ? 'usr-arafath' : 'usr-admin-alex',
@@ -61,26 +52,18 @@ export function App() {
               role: role,
               company_name: companyName
             }}
-            initialTab={activeTab}
+            brandName={companyName}
+            showRoleSwitcher={true}
             onRoleChange={(newRole) => setRole(newRole)}
           />
 
           {/* Footer matching screenshot */}
-          <footer style={{
-            marginTop: '40px',
-            paddingTop: '20px',
-            borderTop: '1px solid #1a2336',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '12px',
-            color: '#64748b'
-          }}>
+          <footer className="mt-10 pt-5 border-t border-[#1a2336] flex flex-wrap justify-between items-center text-xs text-gray-500 gap-2">
             <div>
               CSI Smart Tech &copy; 2026 All right reserved to CSI Smart Tech.
             </div>
             <div>
-              Powered by <span style={{ color: '#38bdf8' }}>CSI Smart Tech</span>
+              Powered by <span className="text-[#38bdf8] font-medium">CSI Smart Tech</span>
             </div>
           </footer>
         </main>

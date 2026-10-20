@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 * {
   margin: 0;
   padding: 0;
@@ -13,7 +17,6 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden;
 }
 
 /* Custom Scrollbar */
@@ -33,12 +36,4 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
-}
-
-button {
-  font-family: inherit;
-}
-
-input, select, textarea {
-  font-family: inherit;
 }

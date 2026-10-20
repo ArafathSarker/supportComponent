@@ -1,174 +1,146 @@
-# Plug-and-Play IoT Support & Visiting Component
+# 🎫 Plug-and-Play Support Ticket Component
 
-A full-stack, modular, plug-and-play **Support Ticket & Factory Visiting Management Component** designed for IoT solutions, SCADA platforms, and enterprise software.
+A modern, full-stack, modular **Support Ticket Component** designed for enterprise web applications, IoT solutions, and SCADA systems.
 
-Built with **FastAPI (Python)**, **PostgreSQL**, **React (Vite + TypeScript)**, **WebSockets**, and **Docker / Docker Compose**.
-
----
-
-## 🌟 Key Features
-
-### 1. Two-Role Architecture
-- **🏢 Company Admin (Client / Factory Owner)**:
-  - Raise support tickets with affected IoT solution/system, problem category, urgency level, detailed description, and photo/video evidence.
-  - View real-time active and resolved ticket metrics.
-  - **Live Chat via WebSocket**: Chat directly with Solution Provider / Super Admin in real-time.
-  - **Exclusive Close Authority**: *Only the company owner / consumer can close a ticket.*
-  - **Visiting Report**: Review and **acknowledge** incoming on-site visits scheduled by the solution provider (confirm gate pass, specify escorts).
-- **🛠️ Super Admin (Solution Provider / Support Lead)**:
-  - Monitor all tickets across client facilities.
-  - Update ticket statuses (`Under Review`, `In Progress`, `Pending Customer Close`).
-  - *Strict Rule Enforcement*: Super Admin cannot close tickets until the client marks them resolved.
-  - **Visiting Log / Dispatch**: Schedule factory visits for engineers, specifying target machine, safety PPE, scheduled time, and purpose.
-  - Log post-visit service summaries and field findings.
-
-### 2. Real-Time WebSocket Communication
-- Live bidirectional chat per ticket room (`/ws/tickets/{ticket_id}`).
-- Typing indicators and instant event broadcasting.
-- Global notification stream (`/ws/notifications`) for instantaneous dashboard list refreshes.
-
-### 3. Plug-and-Play Design
-- **Frontend**: Self-contained React component (`src/components/support/SupportModule.tsx`) that can be dropped into any React or Next.js app with 1 line of code.
-- **Backend**: Modular FastAPI routers (`tickets.py`, `visiting.py`, `chat_ws.py`, `upload.py`) that mount under any FastAPI application.
+Styled with **Tailwind CSS v3**, backed by **FastAPI (Python)**, **PostgreSQL / SQLite**, and **Real-Time WebSockets**.
 
 ---
 
-## 🚀 Quick Start with Docker & Docker Compose
+## ⚡ Highlights
 
-Run the entire stack (PostgreSQL + FastAPI Backend + Vite React Frontend) with a single command:
+- **Pure Plug-and-Play**: Copy `frontend/src/components/support` into any React / Vite / Next.js project and import `<SupportTicketModule />`.
+- **Styled with Tailwind CSS v3**: Clean, customizable utility classes with dark obsidian/navy aesthetics matching industrial dashboards.
+- **Two Roles with Enforcement**:
+  - **Company Owner / Client (`company_admin`)**: Raise support tickets, upload photos/videos, live chat via WebSocket, and *has exclusive authority to close resolved tickets* (with star rating & remarks).
+  - **Solution Provider (`super_admin`)**: Triage tickets, update status (`Under Review`, `In Progress`, `Pending Customer Close`), and live chat. *Super Admin cannot close tickets until the client closes them.*
+- **Real-Time Live Chat via WebSockets**: Instant message delivery per ticket room (`/ws/tickets/{ticket_id}`) with typing indicator, sender badges, and attachments.
+- **Search & Filters**: Search by problem summary or machine reference, filter by status and urgency.
+- **Metrics Dashboard**: Active tickets, resolved/closed tickets, and total tickets counters.
 
-```bash
-docker compose up --build
+---
+
+## 📦 How to Integrate into Any React / Next.js App
+
+### Step 1: Copy Component Files
+Copy the `src/components/support/` folder into your project.
+
+### Step 2: Ensure Tailwind CSS is configured
+Make sure your project has Tailwind CSS v3 installed and your `tailwind.config.js` includes the component path:
+
+```js
+// tailwind.config.js
+module.exports = {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
 ```
 
-- **Frontend App**: [http://localhost:3000](http://localhost:3000) (or `http://localhost:5173` in local dev)
-- **FastAPI API & Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **PostgreSQL**: Port `5432`
-
----
-
-## 💻 Standalone Local Setup (Without Docker)
-
-### Backend (Python FastAPI)
-
-```bash
-cd backend
-
-# 1. Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Configure environment (optional, defaults to SQLite fallback if Postgres is offline)
-cp .env.example .env
-
-# 4. Run database tests
-PYTHONPATH=. pytest tests
-
-# 5. Start FastAPI development server
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Frontend (Vite React + TypeScript)
-
-```bash
-cd frontend
-
-# 1. Install dependencies
-npm install
-
-# 2. Start Vite dev server
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
----
-
-## 🔌 How to Plug & Play into an Existing Project
-
-### 1. In your Frontend (React / Vite / Next.js)
-
-Copy the `frontend/src/components/support/` folder into your project's components directory:
+### Step 3: Mount the Component
 
 ```tsx
-import React, { useState } from 'react';
-import { SupportModule, UserRole } from './components/support';
+import React from 'react';
+import { SupportTicketModule } from './components/support';
 
-export function MyDashboard() {
-  const [currentRole, setCurrentRole] = useState<UserRole>('company_admin');
-
+export function DashboardPage() {
   return (
-    <div className="dashboard-content">
-      <SupportModule
-        role={currentRole}
+    <div className="min-h-screen bg-[#0b0f19] p-6">
+      <SupportTicketModule
+        role="company_admin" // or 'super_admin'
         currentUser={{
-          id: 'user-001',
+          id: 'usr-101',
           name: 'Arafath',
-          role: currentRole,
-          company_name: 'CSI Smart Tech Ltd'
+          role: 'company_admin',
+          company_name: 'CSI Smart Tech Ltd',
+          email: 'arafath@example.com'
         }}
+        brandName="CSI Smart Tech Ltd"
         apiUrl="http://localhost:8000/api"
         wsUrl="ws://localhost:8000/ws"
-        onRoleChange={(newRole) => setCurrentRole(newRole)}
+        showRoleSwitcher={true} // Set false in production with real auth
+        categories={[
+          'Hardware / Sensor / Device Problem',
+          'Software / Firmware / App Bug',
+          'Network / Connectivity Issue',
+          'Data / Export / Reporting Issue',
+          'SCADA / Dashboard / Display Issue',
+          'User Account / Access / Permission',
+          'Billing / Subscription / License',
+          'Installation / Commissioning',
+          'Other / General Enquiry'
+        ]}
+        systems={[
+          'Water Flow Monitoring',
+          'Main Electrical Substation SCADA',
+          'Boiler Telemetry Unit',
+          'Energy Meter Gateway',
+          'Chiller Sensor Line'
+        ]}
+        onTicketCreated={(ticket) => console.log('New ticket:', ticket)}
+        onTicketClosed={(ticketId) => console.log('Closed ticket:', ticketId)}
       />
     </div>
   );
 }
 ```
 
-### 2. In your Backend (FastAPI)
+---
 
-Mount the routers in your existing `main.py`:
+## 🛠️ Props & Customization API
 
-```python
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from app.routers import tickets, visiting, chat_ws, upload
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `role` | `'company_admin' \| 'super_admin'` | `'company_admin'` | Active role perspective |
+| `currentUser` | `CurrentUser` | Default mock user | Current logged-in user details (id, name, role, company_name) |
+| `apiUrl` | `string` | `http://localhost:8000/api` | Base URL for REST API endpoints |
+| `wsUrl` | `string` | `ws://localhost:8000/ws` | Base WebSocket URL for real-time live chat |
+| `brandName` | `string` | `'CSI Smart Tech Ltd'` | Organization or brand name displayed |
+| `showRoleSwitcher` | `boolean` | `true` | Show/hide the top 1-click role switcher banner (ideal for testing) |
+| `categories` | `string[]` | Default 9 categories | Customizable list of problem categories |
+| `systems` | `string[]` | Default IoT systems | Customizable list of affected systems/solutions |
+| `className` | `string` | `''` | Custom wrapper CSS classes |
+| `onRoleChange` | `(role) => void` | `undefined` | Callback when role is changed |
+| `onTicketCreated` | `(ticket) => void` | `undefined` | Callback when a new ticket is raised |
+| `onTicketClosed` | `(ticketId) => void` | `undefined` | Callback when a ticket is closed |
 
-app = FastAPI()
+---
 
-# Mount support routers
-app.include_router(tickets.router, prefix="/api")
-app.include_router(visiting.router, prefix="/api")
-app.include_router(upload.router, prefix="/api")
-app.include_router(chat_ws.router)
+## 🐳 Running with Docker & Docker Compose
 
-# Mount uploads directory for photo/video evidence
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+To start PostgreSQL, the FastAPI backend, and the React frontend together:
+
+```bash
+docker compose up --build
 ```
 
----
-
-## 📋 API Reference
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/tickets` | List tickets with filters (`role`, `status`, `urgency`, `search`) |
-| `GET` | `/api/tickets/stats` | Active, in-progress, and closed ticket counts |
-| `POST` | `/api/tickets` | Create a new support ticket |
-| `GET` | `/api/tickets/{id}` | Get ticket details, messages & attachments |
-| `PATCH` | `/api/tickets/{id}/status` | Update status (*Super Admin cannot close*) |
-| `POST` | `/api/tickets/{id}/close` | Company Admin closes ticket with feedback |
-| `POST` | `/api/tickets/{id}/reopen` | Reopen resolved ticket |
-| `POST` | `/api/tickets/{id}/messages` | Post a chat message |
-| `WS` | `/ws/tickets/{id}` | Real-time WebSocket bidirectional chat |
-| `WS` | `/ws/notifications` | Global event notifications |
-| `GET` | `/api/visiting` | List visiting reports / logs |
-| `POST` | `/api/visiting` | Super Admin schedules a factory visit |
-| `POST` | `/api/visiting/{id}/acknowledge` | Company Admin acknowledges visit |
-| `POST` | `/api/visiting/{id}/complete` | Super Admin logs post-visit service summary |
-| `POST` | `/api/upload` | Upload photos/videos evidence |
+- **Frontend**: [http://localhost:3000](http://localhost:3000) (or `http://localhost:5173` in local dev)
+- **FastAPI API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **PostgreSQL Database**: Port `5432`
 
 ---
 
-## 🎨 Theme & UI Aesthetics
+## 💻 Local Standalone Run
 
-Designed with a sleek dark-mode glassmorphic interface matching enterprise SCADA and industrial IoT dashboards:
-- Dark slate/obsidian palette (`#0B0F19`, `#111827`, `#1F293D`)
-- Blue & Indigo accents (`#3B82F6`, `#6366F1`)
-- Color-coded urgency levels (Low: Emerald, Medium: Amber, High: Orange, Critical: Crimson)
-- Real-time pulsating connection beacons
-- Fully responsive on mobile, tablet, and desktop
+### 1. Backend (FastAPI)
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 2. Frontend (Vite + React + Tailwind CSS)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Visit [http://localhost:5173](http://localhost:5173).

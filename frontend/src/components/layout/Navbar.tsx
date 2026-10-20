@@ -1,134 +1,78 @@
 import React from 'react';
-import { Menu, Bell, Moon, Sun, Shield, Building2, ChevronRight } from 'lucide-react';
-import { UserRole } from '../support/types';
+import { Menu, Bell, Moon, Shield, Building2, ChevronRight } from 'lucide-react';
+import type { UserRole } from '../support/types';
 
 interface NavbarProps {
-  activeTab: 'tickets' | 'visiting';
   role: UserRole;
   onRoleToggle: () => void;
   userName: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  activeTab,
   role,
   onRoleToggle,
   userName
 }) => {
   return (
-    <header style={{
-      height: '60px',
-      background: '#0b0f19',
-      borderBottom: '1px solid #1a2336',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 24px',
-      gap: '16px'
-    }}>
-      {/* Left section: Hamburger, Breadcrumbs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <button style={{
-          background: 'transparent',
-          border: 'none',
-          color: '#94a3b8',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '4px'
-        }}>
-          <Menu size={20} />
+    <header className="h-14 bg-[#0b0f19] border-b border-[#1a2336] flex items-center justify-between px-6 gap-4">
+      {/* Left: Hamburger & Breadcrumbs */}
+      <div className="flex items-center gap-4">
+        <button type="button" className="text-gray-400 hover:text-white transition-colors">
+          <Menu size={18} />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px' }}>
-          <span style={{ color: '#64748b' }}>Dashboard</span>
-          <ChevronRight size={14} color="#475569" />
-          <span style={{ color: '#cbd5e1' }}>{userName}</span>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-gray-500">Dashboard</span>
+          <ChevronRight size={13} className="text-gray-600" />
+          <span className="text-gray-300 font-medium">{userName}</span>
         </div>
       </div>
 
-      {/* Right section: Role switcher, Notifications, Theme, User Avatar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-        {/* Role Toggle Pill in Header */}
+      {/* Right: Quick Role Switcher, Bell, Theme, Avatar */}
+      <div className="flex items-center gap-4">
+        {/* Role Toggle Pill */}
         <button
+          type="button"
           onClick={onRoleToggle}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: role === 'company_admin' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(168, 85, 247, 0.12)',
-            border: `1px solid ${role === 'company_admin' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(168, 85, 247, 0.3)'}`,
-            color: role === 'company_admin' ? '#60a5fa' : '#c084fc',
-            padding: '6px 12px',
-            borderRadius: '9999px',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          title="Click to switch role between Company Owner and Super Admin"
+          title="Click to toggle perspective between Company Owner and Super Admin"
+          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+            role === 'company_admin'
+              ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20'
+              : 'bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20'
+          }`}
         >
           {role === 'company_admin' ? (
             <>
-              <Building2 size={14} />
+              <Building2 size={13} />
               <span>Role: Company Owner</span>
             </>
           ) : (
             <>
-              <Shield size={14} />
+              <Shield size={13} />
               <span>Role: Super Admin</span>
             </>
           )}
-          <span style={{ opacity: 0.6, fontSize: '10px', textDecoration: 'underline' }}>[switch]</span>
+          <span className="opacity-50 text-[10px] underline">[switch]</span>
         </button>
 
         {/* Notifications Bell */}
-        <div style={{ position: 'relative', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
-          <Bell size={18} />
-          <span style={{
-            position: 'absolute',
-            top: '-4px',
-            right: '-4px',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: '#ef4444'
-          }} />
+        <div className="relative text-gray-400 hover:text-gray-200 cursor-pointer">
+          <Bell size={17} />
+          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />
         </div>
 
-        {/* Dark Theme Icon */}
-        <div style={{ cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
-          <Moon size={18} />
+        {/* Theme Toggle */}
+        <div className="text-gray-400 hover:text-gray-200 cursor-pointer">
+          <Moon size={17} />
         </div>
 
         {/* User Avatar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            position: 'relative',
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: '13px'
-          }}>
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-bold text-xs shadow-md">
             {userName.charAt(0).toUpperCase()}
-            <span style={{
-              position: 'absolute',
-              bottom: 0,
-              right: 0,
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: '#22c55e',
-              border: '1.5px solid #0b0f19'
-            }} />
+            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0b0f19]" />
           </div>
-          <span style={{ fontSize: '13px', color: '#f3f4f6', fontWeight: 500 }}>
+          <span className="text-xs font-medium text-gray-200 hidden sm:inline">
             {userName}
           </span>
         </div>

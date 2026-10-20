@@ -1,16 +1,9 @@
 import React, { useState } from 'react';
-import { X, Upload, Loader2 } from 'lucide-react';
-import { Ticket, TicketUrgency, CurrentUser } from './types';
+import { X, Upload, Loader2, AlertCircle } from 'lucide-react';
+import type { Ticket, TicketUrgency, CurrentUser } from './types';
 import { api } from './api';
 
-interface RaiseTicketModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  currentUser: CurrentUser;
-  onTicketCreated: (newTicket: Ticket) => void;
-}
-
-export const CATEGORY_OPTIONS = [
+export const DEFAULT_CATEGORIES = [
   'Hardware / Sensor / Device Problem',
   'Software / Firmware / App Bug',
   'Network / Connectivity Issue',
@@ -22,7 +15,7 @@ export const CATEGORY_OPTIONS = [
   'Other / General Enquiry'
 ];
 
-export const SYSTEM_OPTIONS = [
+export const DEFAULT_SYSTEMS = [
   'Water Flow Monitoring',
   'Main Electrical Substation SCADA',
   'Boiler Pressure & Temperature Line',
@@ -31,18 +24,29 @@ export const SYSTEM_OPTIONS = [
   'Chiller System Sensor Array',
   'Industrial Compressor Line',
   'Factory IoT Edge Gateway',
-  'Other Custom System'
+  'Other / Custom System'
 ];
+
+interface RaiseTicketModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentUser: CurrentUser;
+  categories?: string[];
+  systems?: string[];
+  onTicketCreated: (newTicket: Ticket) => void;
+}
 
 export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
   isOpen,
   onClose,
   currentUser,
+  categories = DEFAULT_CATEGORIES,
+  systems = DEFAULT_SYSTEMS,
   onTicketCreated
 }) => {
   const [title, setTitle] = useState('');
-  const [affectedSystem, setAffectedSystem] = useState(SYSTEM_OPTIONS[0]);
-  const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
+  const [affectedSystem, setAffectedSystem] = useState(systems[0] || 'Water Flow Monitoring');
+  const [category, setCategory] = useState(categories[0] || 'Hardware / Sensor / Device Problem');
   const [urgency, setUrgency] = useState<TicketUrgency>('Medium');
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<FileList | null>(null);
@@ -70,7 +74,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
       setSubmitting(true);
       setError(null);
 
-      // 1. Create ticket
+      // Create ticket
       const created = await api.createTicket({
         title: title.trim(),
         affected_system: affectedSystem,
@@ -82,7 +86,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
         created_by_role: currentUser.role
       });
 
-      // 2. Upload file attachments if selected
+      // Upload file attachments if any
       if (files && files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           await api.uploadFile(files[i], created.id, currentUser.name);
@@ -91,7 +95,7 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
 
       onTicketCreated(created);
       onClose();
-      // Reset form
+      // Reset state
       setTitle('');
       setDescription('');
       setFiles(null);
@@ -103,70 +107,79 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
   };
 
   return (
-    <div className="sc-modal-overlay" onClick={onClose}>
-      <div className="sc-modal-box" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="sc-modal-header">
-          <h3>Raise Support Ticket</h3>
-          <button className="sc-modal-close" onClick={onClose} aria-label="Close modal">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+      <div 
+        className="bg-[#111827] border border-[#1f293d] rounded-xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="px-6 py-4 border-b border-[#1f293d] flex items-center justify-between bg-[#111827]">
+          <h3 className="text-base font-semibold text-white tracking-wide">
+            Raise Support Ticket
+          </h3>
+          <button
+            type="button"
+            className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            onClick={onClose}
+          >
             <X size={18} />
           </button>
         </div>
 
-        {/* Body Form */}
-        <form onSubmit={handleSubmit}>
-          <div className="sc-modal-body">
+        {/* Modal Body Form */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto space-y-4 flex-1">
             {error && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-                padding: '10px 14px',
-                borderRadius: '6px',
-                fontSize: '13px'
-              }}>
-                {error}
+              <div className="p-3 bg-red-500/15 border border-red-500/30 text-red-400 rounded-lg text-xs flex items-center gap-2">
+                <AlertCircle size={15} />
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Title */}
-            <div className="sc-form-group">
-              <label className="sc-form-label">
-                Title / Problem Summary <span className="required">*</span>
+            {/* Title / Problem Summary */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-300">
+                Title / Problem Summary <span className="text-blue-500">*</span>
               </label>
               <input
                 type="text"
-                className="sc-form-input"
                 placeholder="Enter ticket title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                 required
               />
             </div>
 
-            {/* Two-column Row */}
-            <div className="sc-form-row">
-              {/* Left: Affected System & Urgency */}
-              <div className="sc-form-group">
-                <label className="sc-form-label">Affected System</label>
-                <select
-                  className="sc-form-select"
-                  value={affectedSystem}
-                  onChange={(e) => setAffectedSystem(e.target.value)}
-                >
-                  {SYSTEM_OPTIONS.map((sys) => (
-                    <option key={sys} value={sys}>
-                      {sys}
-                    </option>
-                  ))}
-                </select>
-
-                <div style={{ marginTop: '14px' }}>
-                  <label className="sc-form-label">Urgency Level</label>
+            {/* Two-Column Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Left Column: Affected System & Urgency */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-300">
+                    Affected System
+                  </label>
                   <select
-                    className="sc-form-select"
+                    value={affectedSystem}
+                    onChange={(e) => setAffectedSystem(e.target.value)}
+                    className="w-full bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    {systems.map((sys) => (
+                      <option key={sys} value={sys}>
+                        {sys}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-300">
+                    Urgency Level
+                  </label>
+                  <select
                     value={urgency}
                     onChange={(e) => setUrgency(e.target.value as TicketUrgency)}
+                    className="w-full bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="Low">Low</option>
                     <option value="Medium">Medium</option>
@@ -176,18 +189,18 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
                 </div>
               </div>
 
-              {/* Right: Problem Category */}
-              <div className="sc-form-group">
-                <label className="sc-form-label">
-                  Problem Category <span className="required">*</span>
+              {/* Right Column: Problem Category */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-gray-300">
+                  Problem Category <span className="text-blue-500">*</span>
                 </label>
                 <select
-                  className="sc-form-select"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
+                  className="w-full bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
                   required
                 >
-                  {CATEGORY_OPTIONS.map((cat) => (
+                  {categories.map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
                     </option>
@@ -196,57 +209,57 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
               </div>
             </div>
 
-            {/* Description */}
-            <div className="sc-form-group">
-              <label className="sc-form-label">
-                Describe the Problem in detail <span className="required">*</span>
+            {/* Detailed Description */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-300">
+                Describe the Problem in detail <span className="text-blue-500">*</span>
               </label>
               <textarea
-                className="sc-form-textarea"
                 placeholder="Describe the issue in detail"
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                className="w-full bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-y transition-colors"
                 required
               />
             </div>
 
-            {/* Evidence File Upload */}
-            <div className="sc-form-group">
-              <label className="sc-form-label">
+            {/* File Upload for Supporting Evidence */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-300">
                 Attach Supporting Evidence (Photos or Videos)
               </label>
-              <div className="sc-file-upload-box">
-                <Upload size={18} color="#94a3b8" />
+              <div className="flex items-center gap-3 p-3 bg-[#0b1120] border border-dashed border-[#2d3748] rounded-lg">
+                <Upload size={18} className="text-gray-400 shrink-0" />
                 <input
                   type="file"
                   multiple
-                  className="sc-file-upload-input"
                   onChange={(e) => setFiles(e.target.files)}
+                  className="text-xs text-gray-400 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-blue-400 hover:file:bg-gray-700 cursor-pointer"
                 />
               </div>
               {files && files.length > 0 && (
-                <div style={{ fontSize: '12px', color: '#60a5fa', marginTop: '4px' }}>
-                  {files.length} file(s) selected for upload
+                <div className="text-xs text-blue-400">
+                  {files.length} file(s) ready to upload
                 </div>
               )}
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="sc-modal-footer">
+          {/* Modal Footer */}
+          <div className="px-6 py-4 bg-[#0d1424] border-t border-[#1f293d] flex items-center justify-end gap-3">
             <button
               type="button"
-              className="sc-btn-secondary"
               onClick={onClose}
               disabled={submitting}
+              className="px-4 py-2 rounded-lg text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 border border-[#1f293d] transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="sc-btn-primary"
               disabled={submitting}
+              className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {submitting ? (
                 <>

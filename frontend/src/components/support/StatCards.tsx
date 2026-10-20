@@ -1,5 +1,5 @@
 import React from 'react';
-import { TicketStats } from './types';
+import type { TicketStats } from './types';
 
 interface StatCardsProps {
   stats: TicketStats;
@@ -7,20 +7,35 @@ interface StatCardsProps {
 
 export const StatCards: React.FC<StatCardsProps> = ({ stats }) => {
   return (
-    <div className="sc-stats-grid">
-      <div className="sc-stat-card active">
-        <span className="sc-stat-title">ACTIVE TICKETS</span>
-        <span className="sc-stat-value">{stats.active_tickets}</span>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      {/* Active Tickets */}
+      <div className="bg-[#111827] border border-[#1f293d] border-l-4 border-l-blue-500 rounded-lg p-5 flex flex-col justify-between shadow-lg relative overflow-hidden">
+        <span className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase mb-2">
+          ACTIVE TICKETS
+        </span>
+        <span className="text-3xl font-bold text-blue-400 tracking-tight">
+          {stats.active_tickets}
+        </span>
       </div>
 
-      <div className="sc-stat-card resolved">
-        <span className="sc-stat-title">RESOLVED / CLOSED TICKETS</span>
-        <span className="sc-stat-value">{stats.closed_tickets}</span>
+      {/* Resolved / Closed Tickets */}
+      <div className="bg-[#111827] border border-[#1f293d] border-l-4 border-l-emerald-500 rounded-lg p-5 flex flex-col justify-between shadow-lg relative overflow-hidden">
+        <span className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase mb-2">
+          RESOLVED / CLOSED TICKETS
+        </span>
+        <span className="text-3xl font-bold text-emerald-400 tracking-tight">
+          {stats.closed_tickets}
+        </span>
       </div>
 
-      <div className="sc-stat-card total">
-        <span className="sc-stat-title">TOTAL TICKETS</span>
-        <span className="sc-stat-value">{stats.total_tickets}</span>
+      {/* Total Tickets */}
+      <div className="bg-[#111827] border border-[#1f293d] border-l-4 border-l-indigo-500 rounded-lg p-5 flex flex-col justify-between shadow-lg relative overflow-hidden sm:col-span-2 lg:col-span-1">
+        <span className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase mb-2">
+          TOTAL TICKETS
+        </span>
+        <span className="text-3xl font-bold text-indigo-400 tracking-tight">
+          {stats.total_tickets}
+        </span>
       </div>
     </div>
   );

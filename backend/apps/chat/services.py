@@ -34,14 +34,13 @@ class ChatService:
 
         serialized = MessageSerializer(msg).data
 
-        # Broadcast to ticket room
+        # Broadcast to canonical ticket room
         broadcast_ticket_event(ticket.id, 'new_message', serialized)
-        broadcast_ticket_event(ticket.ticket_code, 'new_message', serialized)
 
         # Broadcast global notification
         if not is_system_event:
             broadcast_global_event('new_chat_message', {
-                'ticket_id': ticket.id,
+                'ticket_id': str(ticket.id),
                 'ticket_code': ticket.ticket_code,
                 'message': serialized,
             })

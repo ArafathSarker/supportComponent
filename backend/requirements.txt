@@ -5,6 +5,7 @@ channels>=4.1.0
 daphne>=4.1.0
 pytest>=8.3.0
 pytest-django>=4.9.0
+pytest-asyncio>=1.4.0
 psycopg2-binary>=2.9.9
 python-dotenv>=1.0.0
 requests>=2.31.0

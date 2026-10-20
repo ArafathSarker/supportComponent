@@ -77,28 +77,58 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
-        if (payload.type === 'chat_message') {
-          const newMsg: TicketMessage = payload.data;
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
+        const eventType = payload.type || payload.event;
+
+        if (eventType === 'chat_message' || eventType === 'new_message') {
+          const newMsg: TicketMessage = payload.data || payload.message || payload;
+          if (newMsg && newMsg.id) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
+        } else if (eventType === 'status_updated' || eventType === 'ticket_status_updated') {
+          const newStatus = (payload.status || (payload.data && payload.data.status)) as TicketStatus;
+          if (newStatus) {
+            setTicket((prev) => {
+              if (!prev) return null;
+              const updated = { ...prev, status: newStatus };
+              onTicketUpdated(updated);
+              return updated;
+            });
+          }
+        } else if (eventType === 'ticket_updated') {
+          const t = payload.data || payload;
+          setTicket((prev) => {
+            if (!prev) return null;
+            const updated: Ticket = {
+              ...prev,
+              title: t.title ?? prev.title,
+              affected_system: t.affected_system ?? prev.affected_system,
+              category: t.category ?? prev.category,
+              urgency: t.urgency ?? prev.urgency,
+              description: t.description ?? prev.description,
+              status: (t.status ?? prev.status) as TicketStatus,
+              updated_at: t.updated_at ?? prev.updated_at
+            };
+            onTicketUpdated(updated);
+            return updated;
           });
-        } else if (payload.type === 'status_updated') {
-          setTicket((prev) => prev ? { ...prev, status: payload.status as TicketStatus } : null);
-        } else if (payload.type === 'ticket_updated') {
-          setTicket((prev) => prev ? {
-            ...prev,
-            title: payload.title ?? prev.title,
-            affected_system: payload.affected_system ?? prev.affected_system,
-            category: payload.category ?? prev.category,
-            urgency: payload.urgency ?? prev.urgency,
-            description: payload.description ?? prev.description,
-            status: payload.status ?? prev.status,
-            updated_at: payload.updated_at ?? prev.updated_at
-          } : null);
-        } else if (payload.type === 'ticket_closed') {
-          setTicket((prev) => prev ? { ...prev, status: 'Closed' } : null);
-        } else if (payload.type === 'typing') {
+        } else if (eventType === 'ticket_closed') {
+          setTicket((prev) => {
+            if (!prev) return null;
+            const updated = { ...prev, status: 'Closed' as TicketStatus };
+            onTicketUpdated(updated);
+            return updated;
+          });
+        } else if (eventType === 'ticket_reopened') {
+          setTicket((prev) => {
+            if (!prev) return null;
+            const updated = { ...prev, status: 'Open' as TicketStatus };
+            onTicketUpdated(updated);
+            return updated;
+          });
+        } else if (eventType === 'typing') {
           if (payload.sender_name !== currentUser.name && payload.is_typing) {
             setTypingUser(payload.sender_name);
             clearTimeout(typingTimerRef.current);
@@ -148,11 +178,19 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(payload));
     } else {
-      await api.sendMessage(ticket.id, {
-        sender_name: currentUser.name,
-        sender_role: currentUser.role,
-        message: text
-      });
+      try {
+        const created = await api.sendMessage(ticket.id, {
+          sender_name: currentUser.name,
+          sender_role: currentUser.role,
+          message: text
+        });
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === created.id)) return prev;
+          return [...prev, created];
+        });
+      } catch (err) {
+        console.error('Failed to send message via HTTP fallback:', err);
+      }
     }
 
     setInputText('');

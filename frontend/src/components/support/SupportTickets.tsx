@@ -87,11 +87,16 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
+        const eventType = payload.type || payload.event;
         if (
-          payload.type === 'new_ticket' ||
-          payload.type === 'ticket_status_updated' ||
-          payload.type === 'ticket_closed' ||
-          payload.type === 'ticket_reopened'
+          eventType === 'new_ticket' ||
+          eventType === 'ticket_created' ||
+          eventType === 'ticket_status_updated' ||
+          eventType === 'ticket_updated' ||
+          eventType === 'status_updated' ||
+          eventType === 'ticket_closed' ||
+          eventType === 'ticket_reopened' ||
+          eventType === 'new_chat_message'
         ) {
           loadData();
         }

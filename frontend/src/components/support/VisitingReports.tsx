@@ -55,6 +55,34 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
     loadReports();
   }, [currentUser.role, currentUser.company_name, statusFilter]);
 
+  // Real-time synchronization for visiting reports
+  useEffect(() => {
+    const wsUrl = api.getWebSocketNotificationsUrl();
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        const eventType = payload.type || payload.event;
+        if (
+          eventType === 'visiting_report_scheduled' ||
+          eventType === 'visiting_report_acknowledged' ||
+          eventType === 'visiting_report_completed'
+        ) {
+          loadReports();
+        }
+      } catch (e) {
+        console.error('Visiting notification parse error:', e);
+      }
+    };
+
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    };
+  }, []);
+
   const handleVisitScheduled = (newVisit: VisitingReport) => {
     setReports((prev) => [newVisit, ...prev]);
   };

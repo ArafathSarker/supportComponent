@@ -150,7 +150,6 @@ class TicketService:
             from .serializers import TicketDetailSerializer
             serialized = TicketDetailSerializer(ticket).data
             broadcast_ticket_event(ticket.id, 'ticket_updated', serialized)
-            broadcast_ticket_event(ticket.ticket_code, 'ticket_updated', serialized)
             broadcast_global_event('ticket_updated', serialized)
 
         return ticket
@@ -183,7 +182,6 @@ class TicketService:
         from .serializers import TicketDetailSerializer
         serialized = TicketDetailSerializer(ticket).data
         broadcast_ticket_event(ticket.id, 'ticket_updated', serialized)
-        broadcast_ticket_event(ticket.ticket_code, 'ticket_updated', serialized)
         broadcast_global_event('ticket_updated', serialized)
 
         return ticket
@@ -214,7 +212,6 @@ class TicketService:
         from .serializers import TicketDetailSerializer
         serialized = TicketDetailSerializer(ticket).data
         broadcast_ticket_event(ticket.id, 'ticket_closed', serialized)
-        broadcast_ticket_event(ticket.ticket_code, 'ticket_closed', serialized)
         broadcast_global_event('ticket_closed', serialized)
 
         return ticket
@@ -242,7 +239,6 @@ class TicketService:
         from .serializers import TicketDetailSerializer
         serialized = TicketDetailSerializer(ticket).data
         broadcast_ticket_event(ticket.id, 'ticket_reopened', serialized)
-        broadcast_ticket_event(ticket.ticket_code, 'ticket_reopened', serialized)
         broadcast_global_event('ticket_reopened', serialized)
 
         return ticket

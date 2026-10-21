@@ -165,6 +165,8 @@ export class SupportApiClient {
     return res.json();
   }
 
+  updateTicketDetails = this.updateTicket.bind(this);
+
   async updateTicketStatus(
     ticketId: string,
     status: string,
@@ -261,11 +263,17 @@ export class SupportApiClient {
     return res.json();
   }
 
-  async uploadFile(file: File, ticketId?: string, uploadedBy: string = 'User'): Promise<{ url: string; filename: string }> {
+  async uploadFile(
+    file: File,
+    ticketId?: string,
+    uploadedBy: string = 'User',
+    source: 'ticket_creation' | 'chat' = 'ticket_creation'
+  ): Promise<{ url: string; filename: string; file_name?: string; file_path?: string; file_type?: string; file_size?: number }> {
     const formData = new FormData();
     formData.append('file', file);
     if (ticketId) formData.append('ticket_id', ticketId);
     formData.append('uploaded_by', uploadedBy);
+    formData.append('source', source);
 
     const res = await fetch(`${this.apiBase}/upload/`, {
       method: 'POST',
@@ -303,8 +311,13 @@ export class SupportApiClient {
     priority?: string;
     line_number?: string;
     floor_location?: string;
-    visiting_engineers: string;
-    purpose: string;
+    visiting_engineers?: string;
+    lead_engineer?: string;
+    lead_engineer_phone?: string;
+    visiting_team_names?: string;
+    total_visitors?: number;
+    visit_checklist?: import('./types').VisitChecklistItem[];
+    purpose?: string;
     scheduled_date: string;
     estimated_duration?: string;
     entry_requirements?: string;
@@ -356,9 +369,10 @@ export class SupportApiClient {
 
   async completeVisit(
     visitId: string,
-    serviceSummary: string,
+    serviceSummary: string = '',
     completedBy?: string,
-    userRole: string = 'super_admin'
+    userRole: string = 'super_admin',
+    visitChecklist?: import('./types').VisitChecklistItem[]
   ): Promise<VisitingReport> {
     const res = await fetch(`${this.apiBase}/visiting/${visitId}/complete/`, {
       method: 'POST',
@@ -370,6 +384,7 @@ export class SupportApiClient {
       body: JSON.stringify({
         service_summary: serviceSummary,
         completed_by: completedBy,
+        visit_checklist: visitChecklist,
       }),
     });
     if (!res.ok) {

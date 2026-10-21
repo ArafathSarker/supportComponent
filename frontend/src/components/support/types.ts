@@ -27,6 +27,7 @@ export interface TicketAttachment {
   file_type?: string;
   file_size?: number;
   uploaded_by: string;
+  source?: 'ticket_creation' | 'chat';
   created_at: string;
 }
 
@@ -54,6 +55,8 @@ export interface Ticket {
   line_number?: string;
   floor_location?: string;
   machine_id?: string;
+  sensor_id?: string;
+  factory_section?: string;
   iot_details?: Record<string, any>;
   troubleshooting_checklist?: string[];
   description: string;
@@ -84,6 +87,12 @@ export type VisitStatus =
   | 'Completed' 
   | 'Cancelled';
 
+export interface VisitChecklistItem {
+  id: string;
+  task: string;
+  status?: 'pending' | 'solved' | 'unsolved';
+}
+
 export interface VisitingReport {
   id: string;
   visit_code: string;
@@ -94,10 +103,15 @@ export interface VisitingReport {
   line_number?: string;
   floor_location?: string;
   visiting_engineers: string;
+  lead_engineer?: string;
+  lead_engineer_phone?: string;
+  visiting_team_names?: string;
+  total_visitors?: number;
+  visit_checklist?: VisitChecklistItem[];
   purpose: string;
   scheduled_date: string;
-  estimated_duration: string;
-  entry_requirements: string;
+  estimated_duration?: string;
+  entry_requirements?: string;
   status: VisitStatus;
   super_admin_notes?: string;
   company_acknowledgement_notes?: string;

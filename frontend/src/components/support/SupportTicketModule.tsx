@@ -68,31 +68,31 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
   };
 
   return (
-    <div className={`w-full font-sans text-gray-100 ${className}`} id="support-ticket-component">
+    <div className={`w-full font-sans text-slate-800 ${className}`} id="support-ticket-component">
       {/* Role Switcher Banner (Persisted in localStorage) */}
       {showRoleSwitcher && (
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 mb-5 bg-[#111827] border border-[#1f293d] rounded-xl shadow-md">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 mb-5 bg-white border border-slate-200 rounded-xl shadow-xs">
           <div className="flex items-center gap-3 text-xs flex-wrap">
-            <span className="text-gray-400">Current Role:</span>
+            <span className="text-slate-500 font-medium">Current Role:</span>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border ${
               role === 'company_admin'
-                ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
-                : 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : 'bg-purple-50 text-purple-700 border-purple-200'
             }`}>
               {role === 'company_admin' ? (
                 <>
-                  <Building2 size={13} />
+                  <Building2 size={13} className="text-blue-600" />
                   Company Admin (Client / Factory Owner)
                 </>
               ) : (
                 <>
-                  <Shield size={13} />
+                  <Shield size={13} className="text-purple-600" />
                   Super Admin (Solution Provider)
                 </>
               )}
             </span>
-            <span className="text-gray-500 hidden sm:inline">
-              | User: <strong className="text-gray-300">{currentUser.name}</strong> ({currentUser.company_name})
+            <span className="text-slate-500 hidden sm:inline">
+              | User: <strong className="text-slate-800">{currentUser.name}</strong> ({currentUser.company_name})
             </span>
           </div>
 
@@ -100,23 +100,23 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
             type="button"
             onClick={() => handleToggleRole(role === 'company_admin' ? 'super_admin' : 'company_admin')}
             title="Toggle perspective to test both Company Owner and Solution Provider permissions"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 border border-[#1f293d] transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all shadow-xs"
           >
-            <Wrench size={13} />
+            <Wrench size={13} className="text-slate-600" />
             Switch to {role === 'company_admin' ? 'Super Admin' : 'Company Admin'} View
           </button>
         </div>
       )}
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#1f293d] mb-6">
+      <div className="flex items-center gap-2 border-b border-slate-200 mb-6">
         <button
           type="button"
           onClick={() => handleTabSwitch('tickets')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
             currentTab === 'tickets'
-              ? 'text-blue-400 border-blue-500 bg-blue-500/10 rounded-t-lg'
-              : 'text-gray-400 border-transparent hover:text-gray-200'
+              ? 'text-blue-600 border-blue-600 bg-blue-50/70 rounded-t-lg'
+              : 'text-slate-500 border-transparent hover:text-slate-800 hover:bg-slate-100/60'
           }`}
         >
           <Ticket size={15} />
@@ -128,8 +128,8 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
           onClick={() => handleTabSwitch('visiting')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
             currentTab === 'visiting'
-              ? 'text-blue-400 border-blue-500 bg-blue-500/10 rounded-t-lg'
-              : 'text-gray-400 border-transparent hover:text-gray-200'
+              ? 'text-blue-600 border-blue-600 bg-blue-50/70 rounded-t-lg'
+              : 'text-slate-500 border-transparent hover:text-slate-800 hover:bg-slate-100/60'
           }`}
         >
           <FileCheck2 size={15} />

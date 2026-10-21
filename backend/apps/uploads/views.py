@@ -48,7 +48,13 @@ class FileUploadView(APIView):
             'User'
         )
 
-        if ticket_id:
+        source = (
+            request.data.get('source') or
+            request.query_params.get('source') or
+            'ticket_creation'
+        )
+
+        if ticket_id and source == 'ticket_creation':
             ticket = Ticket.objects.filter(Q(id=ticket_id) | Q(ticket_code=ticket_id)).first()
             if ticket:
                 attachment = TicketAttachment.objects.create(
@@ -57,7 +63,8 @@ class FileUploadView(APIView):
                     file_path=file_url,
                     file_type=file_type,
                     file_size=file_obj.size,
-                    uploaded_by=uploaded_by
+                    uploaded_by=uploaded_by,
+                    source='ticket_creation'
                 )
                 attachment_id = attachment.id
 

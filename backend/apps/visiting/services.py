@@ -72,6 +72,9 @@ class VisitingReportService:
 
         visit_code = generate_visit_code(VisitingReport)
 
+        lead_engineer = data.get('lead_engineer') or data.get('visiting_engineers', '')
+        visiting_engineers = data.get('visiting_engineers') or lead_engineer
+
         report = VisitingReport.objects.create(
             visit_code=visit_code,
             ticket=ticket,
@@ -80,8 +83,13 @@ class VisitingReportService:
             priority=data.get('priority', 'High'),
             line_number=data.get('line_number', ''),
             floor_location=data.get('floor_location', ''),
-            visiting_engineers=data['visiting_engineers'],
-            purpose=data['purpose'],
+            visiting_engineers=visiting_engineers,
+            lead_engineer=lead_engineer,
+            lead_engineer_phone=data.get('lead_engineer_phone', ''),
+            visiting_team_names=data.get('visiting_team_names', ''),
+            total_visitors=data.get('total_visitors', 1),
+            visit_checklist=data.get('visit_checklist', []),
+            purpose=data.get('purpose', ''),
             scheduled_date=data['scheduled_date'],
             estimated_duration=data.get('estimated_duration', '2 Hours'),
             entry_requirements=data.get('entry_requirements', 'Standard Factory Safety Equipment & Gate Pass'),
@@ -133,12 +141,19 @@ class VisitingReportService:
         return report
 
     @staticmethod
-    def complete_report(report: VisitingReport, service_summary: str, user_name: str, user_role: str) -> VisitingReport:
+    def complete_report(report: VisitingReport, service_summary: str, user_name: str, user_role: str, visit_checklist: list = None) -> VisitingReport:
         if user_role == 'company_admin':
             raise PermissionDenied("Only Solution Provider engineers (super_admin) can mark visiting reports completed.")
 
         report.status = "Completed"
-        report.service_summary = service_summary
+        if visit_checklist is not None:
+            report.visit_checklist = visit_checklist
+        if service_summary:
+            report.service_summary = service_summary
+        elif not report.service_summary and visit_checklist:
+            solved_count = sum(1 for item in visit_checklist if item.get('status') == 'solved')
+            total_count = len(visit_checklist)
+            report.service_summary = f"{solved_count} of {total_count} checklist objectives resolved."
         report.completed_at = timezone.now()
         report.save()
 

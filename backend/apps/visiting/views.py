@@ -82,12 +82,14 @@ class VisitingReportCompleteView(APIView):
 
         user_role = request.headers.get('x-user-role') or request.query_params.get('role') or 'super_admin'
         user_name = request.headers.get('x-user-name') or 'Field Engineer'
-        summary = serializer.validated_data['service_summary']
+        summary = serializer.validated_data.get('service_summary', '')
+        visit_checklist = serializer.validated_data.get('visit_checklist', None)
 
         completed_report = VisitingReportService.complete_report(
             report=report,
             service_summary=summary,
             user_name=user_name,
-            user_role=user_role
+            user_role=user_role,
+            visit_checklist=visit_checklist
         )
         return Response(VisitingReportSerializer(completed_report).data, status=status.HTTP_200_OK)

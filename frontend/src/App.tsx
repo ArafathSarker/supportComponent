@@ -23,7 +23,7 @@ export function App() {
   const companyName = 'CSI Smart Tech Ltd';
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0b0f19]">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#f8fafc] text-slate-800">
       {/* Sidebar (Responsive for Desktop & Mobile) */}
       <Sidebar 
         role={role} 
@@ -35,7 +35,7 @@ export function App() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0 bg-[#f8fafc]">
         {/* Navbar with Mobile Menu Trigger */}
         <Navbar
           role={role}
@@ -45,17 +45,17 @@ export function App() {
         />
 
         {/* Content Body */}
-        <main className="flex-1 overflow-y-auto p-3.5 sm:p-6">
+        <main className="flex-1 overflow-y-auto p-3.5 sm:p-6 bg-[#f8fafc]">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-xs mb-4 sm:mb-5">
             <span 
-              className="text-blue-500 hover:underline cursor-pointer font-medium" 
+              className="text-blue-600 hover:underline cursor-pointer font-semibold" 
               onClick={() => setActiveTab('tickets')}
             >
               Support
             </span>
-            <span className="text-gray-600">/</span>
-            <span className="text-gray-400 truncate">
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-600 font-medium truncate">
               {activeTab === 'tickets' ? 'Support Tickets' : (role === 'company_admin' ? 'Visiting Report' : 'Visiting Log')}
             </span>
           </div>
@@ -78,12 +78,12 @@ export function App() {
           />
 
           {/* Footer */}
-          <footer className="mt-8 sm:mt-12 pt-4 border-t border-[#1a2336] flex flex-col sm:flex-row justify-between items-center text-[11px] sm:text-xs text-gray-500 gap-2 text-center sm:text-left">
+          <footer className="mt-8 sm:mt-12 pt-4 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center text-[11px] sm:text-xs text-slate-500 gap-2 text-center sm:text-left">
             <div>
               CSI Smart Tech &copy; 2026 All right reserved to CSI Smart Tech.
             </div>
             <div>
-              Powered by <span className="text-[#38bdf8] font-medium">CSI Smart Tech</span>
+              Powered by <span className="text-blue-600 font-semibold">CSI Smart Tech</span>
             </div>
           </footer>
         </main>

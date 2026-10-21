@@ -18,6 +18,8 @@ class Ticket(models.Model):
     line_number = models.CharField(max_length=100, blank=True, default="")
     floor_location = models.CharField(max_length=100, blank=True, default="")
     machine_id = models.CharField(max_length=100, blank=True, default="")
+    sensor_id = models.CharField(max_length=255, blank=True, default="")
+    factory_section = models.CharField(max_length=255, blank=True, default="")
     description = models.TextField()
     status = models.CharField(max_length=50, default="Open")
     company_name = models.CharField(max_length=150, default="CSI Smart Tech Ltd")
@@ -49,6 +51,7 @@ class TicketAttachment(models.Model):
     file_type = models.CharField(max_length=100, blank=True, null=True)
     file_size = models.IntegerField(default=0)
     uploaded_by = models.CharField(max_length=100)
+    source = models.CharField(max_length=50, default="ticket_creation", blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:

@@ -21,7 +21,8 @@ import {
   FileText,
   Maximize2,
   Eye,
-  Loader2
+  Loader2,
+  Tag
 } from 'lucide-react';
 import type { Ticket, TicketMessage, CurrentUser, TicketStatus } from './types';
 import { api } from './api';
@@ -121,50 +122,17 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               return updated;
             });
           }
-        } else if (eventType === 'ticket_updated') {
-          const t = payload.data || payload;
-          setTicket((prev) => {
-            if (!prev) return null;
-            const updated: Ticket = {
-              ...prev,
-              title: t.title ?? prev.title,
-              affected_system: t.affected_system ?? prev.affected_system,
-              category: t.category ?? prev.category,
-              urgency: t.urgency ?? prev.urgency,
-              description: t.description ?? prev.description,
-              status: (t.status ?? prev.status) as TicketStatus,
-              updated_at: t.updated_at ?? prev.updated_at
-            };
-            onTicketUpdated(updated);
-            return updated;
-          });
-        } else if (eventType === 'ticket_closed') {
-          setTicket((prev) => {
-            if (!prev) return null;
-            const updated = { ...prev, status: 'Closed' as TicketStatus };
-            onTicketUpdated(updated);
-            return updated;
-          });
-        } else if (eventType === 'ticket_reopened') {
-          setTicket((prev) => {
-            if (!prev) return null;
-            const updated = { ...prev, status: 'Open' as TicketStatus };
-            onTicketUpdated(updated);
-            return updated;
-          });
         } else if (eventType === 'typing') {
-          if (payload.sender_name !== currentUser.name && payload.is_typing) {
+          if (payload.sender_name && payload.sender_name !== currentUser.name) {
             setTypingUser(payload.sender_name);
             clearTimeout(typingTimerRef.current);
             typingTimerRef.current = setTimeout(() => {
               setTypingUser(null);
-            }, 3000);
-          } else {
-            setTypingUser(null);
+            }, 2500);
           }
         }
-      } catch (e) {
-        console.error('WS Parse Error:', e);
+      } catch (err) {
+        console.error('Failed to process WebSocket message:', err);
       }
     };
 
@@ -188,6 +156,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
 
   if (!isOpen || !ticket) return null;
 
+  // Staged chat file sending: ONLY uploads when clicking Send, with source='chat'
   const handleSendMessage = async () => {
     const text = inputText.trim();
     if (!text && !pendingFile) return;
@@ -199,7 +168,8 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
     if (pendingFile) {
       try {
         setUploadingFile(true);
-        const uploadRes = await api.uploadFile(pendingFile, ticket.id, currentUser.name);
+        // Mark explicitly as 'chat' so backend does NOT add it to ticket creation attachments!
+        const uploadRes = await api.uploadFile(pendingFile, ticket.id, currentUser.name, 'chat');
         attachmentUrl = uploadRes.url;
         attachmentName = uploadRes.filename || pendingFile.name;
       } catch (err: any) {
@@ -241,13 +211,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
 
     setInputText('');
     handleRemovePendingFile();
-
-    if (attachmentUrl) {
-      api.getTicketDetail(ticket.id).then((fresh) => {
-        setTicket(fresh);
-        onTicketUpdated(fresh);
-      }).catch((e) => console.error('Failed to refresh ticket attachments:', e));
-    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -278,7 +241,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
     } else {
       setPendingFilePreview(null);
     }
-    // Reset so same file could be re-selected if canceled
     e.target.value = '';
   };
 
@@ -342,48 +304,53 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
   const isCompanyAdmin = currentUser.role === 'company_admin';
   const isSuperAdmin = currentUser.role === 'super_admin';
 
+  // Rule: On the left side, ONLY show media sent directly at the time of ticket creation!
+  const initialEvidenceAttachments = (ticket.attachments || []).filter(
+    (att) => att.source !== 'chat'
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
       <div 
-        className="w-full max-w-4xl bg-[#0f172a] border-l border-[#1f293d] h-full flex flex-col shadow-2xl overflow-hidden"
+        className="w-full max-w-4xl bg-white border-l border-slate-200 h-full flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drawer Header */}
-        <div className="px-4 sm:px-6 py-3.5 bg-[#111827] border-b border-[#1f293d] flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <span className="font-mono text-xs sm:text-sm font-bold text-blue-400">
+            <span className="font-mono text-xs sm:text-sm font-bold text-blue-600">
               {ticket.ticket_code}
             </span>
 
             {/* Status Badge */}
-            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border ${
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold border ${
               ticket.status === 'Closed'
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 : ticket.status === 'In Progress'
-                ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
+                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                 : ticket.status === 'Under Review'
-                ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                : 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-blue-50 text-blue-700 border-blue-200'
             }`}>
               {ticket.status}
             </span>
 
             {/* Urgency Badge */}
-            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border hidden xs:inline-flex ${
+            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold border hidden xs:inline-flex ${
               ticket.urgency === 'Critical'
-                ? 'bg-red-500/20 text-red-400 border-red-500/35 font-semibold'
+                ? 'bg-red-50 text-red-700 border-red-200'
                 : ticket.urgency === 'High'
-                ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                ? 'bg-orange-50 text-orange-700 border-orange-200'
                 : ticket.urgency === 'Medium'
-                ? 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
             }`}>
               {ticket.urgency}
             </span>
 
             {/* Live WebSocket Beacon */}
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
-              <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${wsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'}`} />
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-50 border border-emerald-200 text-emerald-700">
+              <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
               <span className="hidden sm:inline">{wsConnected ? 'Live Chat Online' : 'Connecting...'}</span>
               <span className="sm:hidden">{wsConnected ? 'Live' : '...'}</span>
             </div>
@@ -391,22 +358,22 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
 
           <button 
             type="button" 
-            className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors"
             onClick={onClose}
           >
             <X size={19} />
           </button>
         </div>
 
-        {/* Mobile Tab Switcher (< md screens): Switch between Live Chat & Ticket Details */}
-        <div className="flex md:hidden border-b border-[#1f293d] bg-[#0d1424] shrink-0">
+        {/* Mobile Tab Switcher */}
+        <div className="flex md:hidden border-b border-slate-200 bg-slate-100 shrink-0">
           <button
             type="button"
             onClick={() => setMobileDrawerTab('chat')}
             className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all ${
               mobileDrawerTab === 'chat'
-                ? 'text-blue-400 border-blue-500 bg-blue-500/10'
-                : 'text-gray-400 border-transparent hover:text-gray-200'
+                ? 'text-blue-600 border-blue-600 bg-white'
+                : 'text-slate-500 border-transparent hover:text-slate-800'
             }`}
           >
             <MessageSquare size={14} />
@@ -418,31 +385,31 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             onClick={() => setMobileDrawerTab('details')}
             className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all ${
               mobileDrawerTab === 'details'
-                ? 'text-blue-400 border-blue-500 bg-blue-500/10'
-                : 'text-gray-400 border-transparent hover:text-gray-200'
+                ? 'text-blue-600 border-blue-600 bg-white'
+                : 'text-slate-500 border-transparent hover:text-slate-800'
             }`}
           >
             <Info size={14} />
-            <span>Details & Actions</span>
+            <span>Details & Evidence</span>
           </button>
         </div>
 
         {/* Drawer Layout: Split Screen on Desktop (md:), Tabbed on Mobile */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
-          {/* Left Side: Ticket Metadata & Permission Controls (5 Cols on Desktop) */}
-          <div className={`md:col-span-5 bg-[#0d1424] border-r border-[#1f293d] p-4 sm:p-5 overflow-y-auto space-y-4 ${
+          {/* Left Side: Ticket Metadata & Creation Evidence (5 Cols on Desktop) */}
+          <div className={`md:col-span-5 bg-slate-50/70 border-r border-slate-200 p-4 sm:p-5 overflow-y-auto space-y-4 ${
             mobileDrawerTab === 'details' ? 'block' : 'hidden md:block'
           }`}>
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
                   Problem Title
                 </span>
                 {isCompanyAdmin && (
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(true)}
-                    className="inline-flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 font-medium px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-all"
+                    className="inline-flex items-center gap-1 text-[11px] text-amber-700 hover:text-amber-800 font-medium px-2 py-0.5 rounded bg-amber-50 border border-amber-200 shadow-xs"
                     title="Edit ticket specifications"
                   >
                     <Edit3 size={11} />
@@ -450,153 +417,64 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                   </button>
                 )}
               </div>
-              <h4 className="text-sm font-semibold text-white">
+              <h2 className="text-sm font-bold text-slate-900 leading-snug bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
                 {ticket.title}
-              </h4>
+              </h2>
             </div>
 
-            <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                Affected IoT Solution
-              </span>
-              <span className="text-sm text-blue-400 font-medium">
-                {ticket.affected_system}
-              </span>
-            </div>
-
-            {/* Category & Priority */}
+            {/* System, Category, Floor Grid */}
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                  Category
-                </span>
-                <span className="text-xs text-gray-200 bg-gray-800/80 px-2 py-1 rounded-md inline-block truncate max-w-full">
-                  {ticket.category}
-                </span>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">System</span>
+                <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.affected_system}</span>
               </div>
-
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                  Priority / Impact
-                </span>
-                <span className={`text-xs px-2 py-1 rounded-md font-semibold inline-flex items-center gap-1 border ${
-                  ticket.priority?.includes('Critical') || ticket.urgency === 'Critical'
-                    ? 'bg-red-500/20 text-red-300 border-red-500/40'
-                    : ticket.priority === 'High' || ticket.urgency === 'High'
-                    ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
-                    : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                }`}>
-                  <Flame size={12} />
-                  <span>{ticket.priority || ticket.urgency}</span>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Category</span>
+                <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.category}</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Factory Floor</span>
+                <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.floor_location || 'Floor N/A'}</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Line / Machine</span>
+                <span className="font-semibold text-slate-800 truncate block mt-0.5">
+                  {ticket.line_number || ticket.machine_id || 'Line N/A'}
                 </span>
               </div>
             </div>
 
-            {/* Garments Floor & Machine Location */}
-            {(ticket.line_number || ticket.floor_location || ticket.machine_id) && (
-              <div className="p-2.5 bg-[#0b1120] border border-[#1f293d] rounded-xl space-y-1.5 text-xs">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                  <MapPin size={11} className="text-blue-400" />
-                  <span>Factory Machine Location</span>
-                </span>
-                <div className="space-y-0.5 text-gray-300">
-                  {ticket.line_number && <div><span className="text-gray-500">Line:</span> {ticket.line_number}</div>}
-                  {ticket.floor_location && <div><span className="text-gray-500">Floor:</span> {ticket.floor_location}</div>}
-                  {ticket.machine_id && <div><span className="text-gray-500">Machine Tag:</span> <span className="font-mono text-blue-400">{ticket.machine_id}</span></div>}
-                  {ticket.production_impact && <div><span className="text-gray-500">Impact:</span> <span className="text-amber-400">{ticket.production_impact}</span></div>}
-                </div>
-              </div>
-            )}
-
-            {/* Dynamic IoT Telemetry Parameters */}
-            {ticket.iot_details && Object.keys(ticket.iot_details).length > 0 && (
-              <div className="p-2.5 bg-[#0b1424] border border-blue-900/30 rounded-xl space-y-2 text-xs">
-                <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1">
-                  <Cpu size={12} className="text-blue-400" />
-                  <span>Dynamic IoT Parameters</span>
-                </span>
-                <div className="space-y-1">
-                  {Object.entries(ticket.iot_details).map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between gap-2 border-b border-blue-900/20 pb-1 text-[11px]">
-                      <span className="text-gray-400 capitalize">{k.replace(/_/g, ' ')}:</span>
-                      <span className="text-blue-200 font-mono font-medium truncate max-w-[150px]">{String(v)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Verified Pre-Troubleshooting Checklist */}
-            {ticket.troubleshooting_checklist && ticket.troubleshooting_checklist.length > 0 && (
-              <div className="p-2.5 bg-[#101b2b] border border-indigo-900/30 rounded-xl space-y-1.5 text-xs">
-                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1">
-                  <Check size={12} className="text-emerald-400" />
-                  <span>Pre-Checklist Verified ({ticket.troubleshooting_checklist.length})</span>
-                </span>
-                <ul className="space-y-1 text-[11px] text-gray-300">
-                  {ticket.troubleshooting_checklist.map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-1.5">
-                      <span className="text-emerald-400 font-bold">✓</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-0.5">
-                  Reported By
-                </span>
-                <span className="text-gray-300 truncate block">
-                  {ticket.created_by_name}
-                </span>
-                <span className="text-gray-500 text-[11px]">
-                  ({ticket.company_name})
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-0.5">
-                  Created At
-                </span>
-                <span className="text-gray-400">
-                  {new Date(ticket.created_at).toLocaleDateString()}
-                </span>
-              </div>
-            </div>
-
+            {/* Description */}
             <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                 Problem Description
               </span>
-              <div className="p-3 bg-[#0b1120] border border-[#1f293d] rounded-lg text-xs leading-relaxed text-gray-200 whitespace-pre-wrap max-h-48 overflow-y-auto">
+              <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs leading-relaxed text-slate-800 whitespace-pre-wrap max-h-40 overflow-y-auto shadow-xs">
                 {ticket.description}
               </div>
             </div>
 
-            {/* Uploaded Supporting Evidence (Photos & Videos) */}
+            {/* Left Sidebar: ONLY Photos & Videos Uploaded at Ticket Creation */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <ImageIcon size={13} className="text-blue-400" />
-                  <span>Uploaded Evidence (Photos & Videos)</span>
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon size={14} className="text-blue-600" />
+                  <span>Ticket Creation Evidence</span>
                 </span>
-                {ticket.attachments && ticket.attachments.length > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
-                    {ticket.attachments.length} file{ticket.attachments.length > 1 ? 's' : ''}
+                {initialEvidenceAttachments.length > 0 && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold">
+                    {initialEvidenceAttachments.length} file{initialEvidenceAttachments.length > 1 ? 's' : ''}
                   </span>
                 )}
               </div>
 
-              {!ticket.attachments || ticket.attachments.length === 0 ? (
-                <div className="p-3 bg-[#0b1120] border border-[#1f293d] rounded-xl text-center text-xs text-gray-500">
-                  No photos or videos attached to this ticket.
+              {initialEvidenceAttachments.length === 0 ? (
+                <div className="p-3.5 bg-white border border-slate-200 rounded-xl text-center text-xs text-slate-400 shadow-xs">
+                  No initial photos or videos attached at ticket creation.
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {ticket.attachments.map((att) => {
+                  {initialEvidenceAttachments.map((att) => {
                     const isImg = isImageFile(att.file_name, att.file_type);
                     const isVid = isVideoFile(att.file_name, att.file_type);
                     const fileUrl = api.getFileUrl(att.file_path);
@@ -605,10 +483,10 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                       return (
                         <div
                           key={att.id}
-                          className="group relative bg-[#0b1120] border border-[#1f293d] hover:border-blue-500/50 rounded-xl overflow-hidden shadow-sm transition-all"
+                          className="group relative bg-white border border-slate-200 hover:border-blue-400 rounded-xl overflow-hidden shadow-xs transition-all"
                         >
                           <div 
-                            className="relative h-36 w-full cursor-pointer bg-black/40 overflow-hidden"
+                            className="relative h-36 w-full cursor-pointer bg-slate-100 overflow-hidden"
                             onClick={() => setActiveLightboxImage({ url: fileUrl, title: att.file_name })}
                           >
                             <img
@@ -616,20 +494,19 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                               alt={att.file_name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               onError={(e) => {
-                                // fallback if broken path
                                 (e.target as HTMLImageElement).src = fileUrl;
                               }}
                             />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                              <span className="p-2 rounded-full bg-blue-600/90 text-white shadow-lg">
+                            <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
+                              <span className="p-2 rounded-full bg-blue-600 text-white shadow-md">
                                 <Maximize2 size={16} />
                               </span>
                             </div>
                           </div>
-                          <div className="p-2.5 flex items-center justify-between text-xs text-gray-300 bg-[#0d1527]">
+                          <div className="p-2.5 flex items-center justify-between text-xs text-slate-700 bg-slate-50 border-t border-slate-100">
                             <div className="truncate mr-2">
-                              <p className="font-medium text-white truncate text-[11px]">{att.file_name}</p>
-                              <p className="text-[10px] text-gray-500">
+                              <p className="font-semibold text-slate-900 truncate text-[11px]">{att.file_name}</p>
+                              <p className="text-[10px] text-slate-500">
                                 {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Image'} • {att.uploaded_by || 'Evidence'}
                               </p>
                             </div>
@@ -638,7 +515,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                               download={att.file_name}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors shrink-0"
+                              className="p-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors shrink-0 shadow-xs"
                               title="Download image"
                             >
                               <Download size={13} />
@@ -652,24 +529,24 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                       return (
                         <div
                           key={att.id}
-                          className="bg-[#0b1120] border border-purple-900/40 rounded-xl overflow-hidden shadow-sm space-y-1.5 p-2.5"
+                          className="bg-white border border-purple-200 rounded-xl overflow-hidden shadow-xs space-y-1.5 p-2.5"
                         >
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 mb-1">
-                            <Video size={14} className="text-purple-400" />
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-900 mb-1">
+                            <Video size={14} className="text-purple-600" />
                             <span className="truncate">{att.file_name}</span>
                           </div>
                           <video
                             src={fileUrl}
                             controls
                             preload="metadata"
-                            className="w-full max-h-44 rounded-lg bg-black border border-gray-800"
+                            className="w-full max-h-44 rounded-lg bg-black border border-slate-200"
                           />
-                          <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1">
-                            <span>{att.file_size ? `${(att.file_size / 1024 / 1024).toFixed(1)} MB` : 'Video file'}</span>
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                            <span>{att.file_size ? `${(att.file_size / 1024 / 1024).toFixed(1)} MB` : 'Video'}</span>
                             <a
                               href={fileUrl}
                               download={att.file_name}
-                              className="text-purple-400 hover:underline flex items-center gap-1"
+                              className="text-purple-700 font-semibold hover:underline flex items-center gap-1"
                             >
                               <Download size={11} /> Download Video
                             </a>
@@ -684,16 +561,16 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                         href={fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between p-2.5 bg-[#0b1120] border border-[#1f293d] hover:border-blue-500/40 rounded-xl text-xs text-gray-200 transition-colors group"
+                        className="flex items-center justify-between p-2.5 bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-xs text-slate-800 transition-colors shadow-xs group"
                       >
                         <div className="flex items-center gap-2 truncate">
-                          <FileText size={15} className="text-blue-400 shrink-0" />
+                          <FileText size={15} className="text-blue-600 shrink-0" />
                           <div className="truncate">
-                            <p className="font-medium text-white truncate text-[11px] group-hover:text-blue-400">{att.file_name}</p>
-                            <p className="text-[10px] text-gray-500">{att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Document'}</p>
+                            <p className="font-semibold text-slate-900 truncate text-[11px] group-hover:text-blue-600">{att.file_name}</p>
+                            <p className="text-[10px] text-slate-500">{att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Document'}</p>
                           </div>
                         </div>
-                        <Download size={13} className="text-gray-400 group-hover:text-white shrink-0 ml-2" />
+                        <Download size={13} className="text-slate-400 group-hover:text-slate-800 shrink-0 ml-2" />
                       </a>
                     );
                   })}
@@ -701,45 +578,36 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               )}
             </div>
 
-            {/* Role Action & Rules Box */}
-            <div className="pt-4 border-t border-[#1f293d] space-y-3">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
-                Workflow Actions & Rules
+            {/* Workflow Actions Box */}
+            <div className="pt-3 border-t border-slate-200 space-y-3">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Workflow Actions
               </span>
 
               {/* Company Admin View */}
               {isCompanyAdmin && (
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="w-full py-2.5 px-4 rounded-lg text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Edit3 size={14} />
-                    Edit Ticket Details
-                  </button>
-
                   {ticket.status !== 'Closed' ? (
                     <button
                       type="button"
                       onClick={() => setShowCloseModal(true)}
-                      className="w-full py-2.5 px-4 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 shadow-lg"
+                      className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-all flex items-center justify-center gap-2"
                     >
                       <CheckCircle size={15} />
-                      Close Ticket (Issue Resolved)
+                      <span>Close Ticket (Issue Resolved)</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={handleReopenTicket}
-                      className="w-full py-2.5 px-4 rounded-lg text-xs font-semibold text-gray-200 bg-gray-800 hover:bg-gray-700 border border-[#1f293d] transition-colors flex items-center justify-center gap-2"
+                      className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 shadow-sm transition-all flex items-center justify-center gap-2"
                     >
                       <RotateCcw size={15} />
-                      Reopen Ticket
+                      <span>Reopen Ticket</span>
                     </button>
                   )}
-                  <p className="text-[11px] text-gray-400 leading-tight">
-                    * Company Owner Rule: Only you can close this ticket once satisfied, or edit specifications at any time.
+                  <p className="text-[11px] text-slate-500 leading-tight">
+                    * Company Owner Rule: Only you can formally verify resolution and close this ticket.
                   </p>
                 </div>
               )}
@@ -748,12 +616,12 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               {isSuperAdmin && (
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <label className="text-xs text-gray-300">Set Ticket Status:</label>
+                    <label className="text-xs font-semibold text-slate-700">Set Ticket Status:</label>
                     <select
                       value={ticket.status}
                       onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
                       disabled={ticket.status === 'Closed' || updatingStatus}
-                      className="w-full bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
+                      className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 cursor-pointer shadow-xs"
                     >
                       <option value="Open">Open</option>
                       <option value="Under Review">Under Review</option>
@@ -765,10 +633,10 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                     </select>
                   </div>
 
-                  <div className="p-2.5 bg-red-500/10 border border-red-500/25 rounded-lg text-[11px] text-red-300 flex items-start gap-2">
-                    <ShieldAlert size={15} className="text-red-400 shrink-0 mt-0.5" />
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 flex items-start gap-2">
+                    <ShieldAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
                     <span>
-                      Super Admin cannot close this ticket until the company owner verifies resolution.
+                      Super Admin can set progress, but final ticket closure is reserved for the factory owner.
                     </span>
                   </div>
                 </div>
@@ -777,14 +645,14 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
           </div>
 
           {/* Right Side: Real-Time WebSocket Live Chat (7 Cols on Desktop) */}
-          <div className={`md:col-span-7 bg-[#0b0f19] flex flex-col h-full overflow-hidden ${
+          <div className={`md:col-span-7 bg-slate-100/50 flex flex-col h-full overflow-hidden ${
             mobileDrawerTab === 'chat' ? 'flex' : 'hidden md:flex'
           }`}>
             {/* Chat Thread */}
             <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5" ref={chatScrollRef}>
               {messages.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500 text-xs space-y-2 py-12">
-                  <Clock size={28} />
+                <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs space-y-2 py-12">
+                  <Clock size={28} className="text-slate-300" />
                   <span>No chat messages yet. Type below to start live support.</span>
                 </div>
               )}
@@ -793,7 +661,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 if (msg.is_system_event) {
                   return (
                     <div key={msg.id} className="flex justify-center">
-                      <span className="px-3 py-1 rounded-full bg-gray-800/80 border border-[#1f293d] text-[10px] sm:text-[11px] text-gray-400 text-center max-w-sm">
+                      <span className="px-3 py-1 rounded-full bg-slate-200/80 border border-slate-300/80 text-[10px] sm:text-[11px] text-slate-600 text-center max-w-sm">
                         {msg.message}
                       </span>
                     </div>
@@ -810,29 +678,30 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                       isMine ? 'ml-auto items-end' : 'mr-auto items-start'
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
-                      <span className="truncate max-w-[120px]">{msg.sender_name}</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] ${
-                        isSuper ? 'bg-amber-500/15 text-amber-300' : 'bg-blue-500/15 text-blue-300'
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                      <span className="truncate max-w-[120px] font-medium">{msg.sender_name}</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                        isSuper ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
                       }`}>
                         {isSuper ? 'Super Admin' : 'Company Admin'}
                       </span>
                     </div>
 
                     <div
-                      className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs leading-relaxed break-words shadow-sm ${
+                      className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs leading-relaxed break-words shadow-xs ${
                         isMine
                           ? 'bg-blue-600 text-white rounded-br-none'
-                          : 'bg-[#1e293b] text-gray-100 border border-[#1f293d] rounded-bl-none'
+                          : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-none'
                       }`}
                     >
                       {msg.message}
 
+                      {/* In-Chat Image / Video / Attachment preview */}
                       {msg.attachment_url && (
-                        <div className="mt-2 pt-2 border-t border-white/20">
+                        <div className={`mt-2 pt-2 border-t ${isMine ? 'border-white/20' : 'border-slate-200'}`}>
                           {isImageFile(msg.attachment_name, '') ? (
                             <div 
-                              className="cursor-pointer group relative overflow-hidden rounded-lg border border-white/20 max-w-[240px] max-h-48"
+                              className="cursor-pointer group relative overflow-hidden rounded-lg border border-slate-200 max-w-[240px] max-h-48"
                               onClick={() => setActiveLightboxImage({ url: api.getFileUrl(msg.attachment_url!), title: msg.attachment_name || 'Attached Photo' })}
                             >
                               <img
@@ -840,7 +709,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                                 alt={msg.attachment_name || 'Attachment'}
                                 className="w-full h-auto object-cover group-hover:scale-105 transition-transform"
                               />
-                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                                 <Eye size={18} className="text-white drop-shadow" />
                               </div>
                             </div>
@@ -849,12 +718,14 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                               <video
                                 src={api.getFileUrl(msg.attachment_url)}
                                 controls
-                                className="max-w-xs max-h-48 rounded-lg bg-black border border-white/20"
+                                className="max-w-xs max-h-48 rounded-lg bg-black border border-slate-200"
                               />
                               <a
                                 href={api.getFileUrl(msg.attachment_url)}
                                 download={msg.attachment_name}
-                                className="text-[11px] text-purple-200 hover:underline flex items-center gap-1"
+                                className={`text-[11px] font-semibold hover:underline flex items-center gap-1 ${
+                                  isMine ? 'text-blue-100' : 'text-blue-600'
+                                }`}
                               >
                                 <Download size={11} /> {msg.attachment_name || 'Download Video'}
                               </a>
@@ -864,7 +735,9 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                               href={api.getFileUrl(msg.attachment_url)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs text-blue-200 hover:underline"
+                              className={`inline-flex items-center gap-1.5 text-xs font-semibold hover:underline ${
+                                isMine ? 'text-white' : 'text-blue-600'
+                              }`}
                             >
                               <Paperclip size={12} />
                               {msg.attachment_name || 'Download Attachment'}
@@ -874,7 +747,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                       )}
                     </div>
 
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[10px] text-slate-400">
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -882,35 +755,35 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               })}
 
               {typingUser && (
-                <div className="text-xs italic text-gray-500 animate-pulse">
+                <div className="text-xs italic text-slate-400 animate-pulse">
                   {typingUser} is typing...
                 </div>
               )}
             </div>
 
-            {/* Pending File Attachment Preview (Not uploaded until user clicks Send) */}
+            {/* Pending File Attachment Preview */}
             {pendingFile && (
-              <div className="mx-2.5 sm:mx-4 mb-2 p-2.5 bg-[#0b1424] border border-blue-500/40 rounded-xl flex items-center justify-between gap-3 animate-fadeIn">
+              <div className="mx-2.5 sm:mx-4 mb-2 p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 animate-fadeIn shadow-xs">
                 <div className="flex items-center gap-2.5 overflow-hidden">
                   {pendingFilePreview ? (
                     <img 
                       src={pendingFilePreview} 
                       alt="Preview" 
-                      className="w-11 h-11 object-cover rounded-lg border border-blue-500/30 shrink-0" 
+                      className="w-11 h-11 object-cover rounded-lg border border-blue-300 shrink-0" 
                     />
                   ) : isVideoFile(pendingFile.name, pendingFile.type) ? (
-                    <div className="w-11 h-11 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                    <div className="w-11 h-11 rounded-lg bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-600 shrink-0">
                       <Video size={18} />
                     </div>
                   ) : (
-                    <div className="w-11 h-11 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                    <div className="w-11 h-11 rounded-lg bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
                       <FileText size={18} />
                     </div>
                   )}
                   <div className="truncate">
-                    <p className="text-xs font-semibold text-white truncate max-w-[200px] sm:max-w-xs">{pendingFile.name}</p>
-                    <p className="text-[10px] text-gray-400">
-                      {(pendingFile.size / 1024).toFixed(1)} KB • Staged for send
+                    <p className="text-xs font-bold text-slate-900 truncate max-w-[200px] sm:max-w-xs">{pendingFile.name}</p>
+                    <p className="text-[10px] text-slate-500">
+                      {(pendingFile.size / 1024).toFixed(1)} KB • Staged for send (Click Send to upload)
                     </p>
                   </div>
                 </div>
@@ -918,7 +791,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                   type="button"
                   onClick={handleRemovePendingFile}
                   disabled={uploadingFile}
-                  className="p-1 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                  className="p-1 rounded-lg hover:bg-blue-100 text-slate-500 hover:text-slate-800 transition-colors"
                   title="Remove attachment"
                 >
                   <X size={15} />
@@ -927,7 +800,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             )}
 
             {/* Chat Input Toolbar */}
-            <div className="p-2.5 sm:p-4 bg-[#111827] border-t border-[#1f293d] flex items-end gap-2 shrink-0">
+            <div className="p-2.5 sm:p-4 bg-white border-t border-slate-200 flex items-end gap-2 shrink-0">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -939,14 +812,14 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={ticket.status === 'Closed' || uploadingFile}
                 title="Choose file to attach"
-                className="p-2 sm:p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-[#1f293d] transition-colors shrink-0 disabled:opacity-40"
+                className="p-2 sm:p-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 transition-colors shrink-0 disabled:opacity-40 shadow-xs"
               >
                 <Paperclip size={16} />
               </button>
 
               <textarea
                 rows={1}
-                placeholder={pendingFile ? "Add a message or click Send to upload..." : "Type your message..."}
+                placeholder={pendingFile ? "Add an optional message and click Send..." : "Type your message..."}
                 value={inputText}
                 onChange={(e) => {
                   setInputText(e.target.value);
@@ -954,7 +827,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 }}
                 onKeyDown={handleKeyDown}
                 disabled={ticket.status === 'Closed' || uploadingFile}
-                className="flex-1 bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:border-blue-500 resize-none max-h-24 disabled:opacity-50"
+                className="flex-1 bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs sm:text-sm focus:bg-white focus:outline-none focus:border-blue-500 resize-none max-h-24 disabled:opacity-50 shadow-xs placeholder-slate-400"
               />
 
               <button
@@ -962,7 +835,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 onClick={handleSendMessage}
                 disabled={ticket.status === 'Closed' || (!inputText.trim() && !pendingFile) || uploadingFile}
                 title="Send message and attachments"
-                className="p-2 sm:p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-colors disabled:opacity-40 shrink-0 flex items-center justify-center min-w-[38px]"
+                className="p-2 sm:p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-colors disabled:opacity-40 shrink-0 flex items-center justify-center min-w-[38px]"
               >
                 {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
@@ -973,23 +846,23 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
 
       {/* Close Ticket Confirmation Modal */}
       {showCloseModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowCloseModal(false)}>
-          <div className="bg-[#111827] border border-[#1f293d] rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[#1f293d] pb-3">
-              <h3 className="text-sm font-semibold text-white">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowCloseModal(false)}>
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-sm font-bold text-slate-900">
                 Confirm Resolution & Close Ticket
               </h3>
-              <button onClick={() => setShowCloseModal(false)} className="text-gray-400 hover:text-white">
+              <button onClick={() => setShowCloseModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X size={18} />
               </button>
             </div>
 
-            <p className="text-xs text-gray-300 leading-relaxed">
-              Are you satisfied that the issue regarding <strong>{ticket.affected_system}</strong> has been resolved by the solution provider?
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you satisfied that the issue regarding <strong>{ticket.affected_system}</strong> has been resolved by the engineering team?
             </p>
 
             <div className="space-y-1.5">
-              <label className="text-xs text-gray-300">Rate Service Quality:</label>
+              <label className="text-xs font-semibold text-slate-700">Rate Service Quality:</label>
               <div className="flex items-center gap-1.5">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
@@ -1000,7 +873,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                   >
                     <Star
                       size={22}
-                      className={star <= satisfaction ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}
+                      className={star <= satisfaction ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}
                     />
                   </button>
                 ))}
@@ -1008,28 +881,28 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs text-gray-300">Closing Remarks (Optional):</label>
+              <label className="text-xs font-semibold text-slate-700">Closing Remarks (Optional):</label>
               <textarea
                 rows={2}
                 placeholder="Remarks on resolution..."
                 value={closeNotes}
                 onChange={(e) => setCloseNotes(e.target.value)}
-                className="w-full bg-[#0b1120] border border-[#1f293d] text-gray-100 rounded-lg p-2.5 text-xs focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-xs focus:bg-white focus:outline-none focus:border-blue-500 shadow-sm"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#1f293d]">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setShowCloseModal(false)}
-                className="px-3.5 py-1.5 rounded-lg text-xs text-gray-300 bg-gray-800 hover:bg-gray-700"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 shadow-xs"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleCloseTicket}
-                className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md"
+                className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm"
               >
                 Confirm & Close
               </button>
@@ -1054,20 +927,20 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
       {/* Full-Screen Lightbox Modal for Photo Inspection */}
       {activeLightboxImage && (
         <div 
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fadeIn"
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md animate-fadeIn"
           onClick={() => setActiveLightboxImage(null)}
         >
-          <div className="relative max-w-5xl max-h-[92vh] w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
-            <div className="w-full flex items-center justify-between text-white pb-3 px-2 border-b border-gray-800 mb-3">
+          <div className="relative max-w-5xl max-h-[92vh] w-full flex flex-col items-center bg-white rounded-2xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full flex items-center justify-between pb-3 px-2 border-b border-slate-200 mb-3">
               <div className="flex items-center gap-2 truncate max-w-md">
-                <ImageIcon size={18} className="text-blue-400 shrink-0" />
-                <span className="text-sm font-semibold truncate">{activeLightboxImage.title}</span>
+                <ImageIcon size={18} className="text-blue-600 shrink-0" />
+                <span className="text-sm font-bold text-slate-900 truncate">{activeLightboxImage.title}</span>
               </div>
               <div className="flex items-center gap-2">
                 <a
                   href={activeLightboxImage.url}
                   download={activeLightboxImage.title}
-                  className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium"
+                  className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-xs"
                   title="Download image"
                 >
                   <Download size={15} />
@@ -1076,18 +949,18 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveLightboxImage(null)}
-                  className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white transition-colors"
+                  className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shadow-xs"
                   title="Close viewer"
                 >
                   <X size={18} />
                 </button>
               </div>
             </div>
-            <div className="max-h-[80vh] overflow-auto flex items-center justify-center p-1">
+            <div className="max-h-[75vh] overflow-auto flex items-center justify-center p-1 w-full">
               <img
                 src={activeLightboxImage.url}
                 alt={activeLightboxImage.title}
-                className="max-h-[78vh] max-w-full object-contain rounded-xl border border-gray-800 shadow-2xl"
+                className="max-h-[73vh] max-w-full object-contain rounded-xl border border-slate-200 shadow-md"
               />
             </div>
           </div>

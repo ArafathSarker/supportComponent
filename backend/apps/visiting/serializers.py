@@ -20,6 +20,11 @@ class VisitingReportSerializer(serializers.ModelSerializer):
             'line_number',
             'floor_location',
             'visiting_engineers',
+            'lead_engineer',
+            'lead_engineer_phone',
+            'visiting_team_names',
+            'total_visitors',
+            'visit_checklist',
             'purpose',
             'scheduled_date',
             'estimated_duration',
@@ -46,14 +51,20 @@ class VisitingReportCreateSerializer(serializers.Serializer):
     priority = serializers.CharField(max_length=30, default="High", required=False)
     line_number = serializers.CharField(max_length=100, default="", required=False, allow_blank=True)
     floor_location = serializers.CharField(max_length=100, default="", required=False, allow_blank=True)
-    visiting_engineers = serializers.CharField(max_length=255)
-    purpose = serializers.CharField()
+    visiting_engineers = serializers.CharField(max_length=255, required=False, default="")
+    lead_engineer = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    lead_engineer_phone = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    visiting_team_names = serializers.CharField(required=False, allow_blank=True, default="")
+    total_visitors = serializers.IntegerField(required=False, default=1)
+    visit_checklist = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+    purpose = serializers.CharField(required=False, allow_blank=True, default="")
     scheduled_date = serializers.CharField(max_length=100)
-    estimated_duration = serializers.CharField(max_length=50, default="2 Hours", required=False)
+    estimated_duration = serializers.CharField(max_length=50, default="2 Hours", required=False, allow_blank=True)
     entry_requirements = serializers.CharField(
         max_length=255,
         default="Standard Factory Safety Equipment & Gate Pass",
-        required=False
+        required=False,
+        allow_blank=True
     )
     super_admin_notes = serializers.CharField(required=False, allow_blank=True, default="")
     ticket_id = serializers.CharField(required=False, allow_blank=True, allow_null=True, default=None)
@@ -71,4 +82,5 @@ class VisitingReportCompleteSerializer(serializers.Serializer):
     """
     Validation schema for completing a field visit report (Solution Provider).
     """
-    service_summary = serializers.CharField(required=True)
+    service_summary = serializers.CharField(required=False, allow_blank=True, default="")
+    visit_checklist = serializers.ListField(child=serializers.DictField(), required=False, default=list)

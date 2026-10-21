@@ -1,3 +1,1 @@
-Support Workspace
-Internal triage, severity classification, and root cause diagnostic logs.
-remove this part and the dual view support workspace will only appear in super-admin panel not in company owner when they open the ticket beacuse it is more valid r8
+remove this from ticket and remove the ticket status from support workspace please because it causes duplicate called Status Control in that tab means only remove that part but the saving workspace will be the same bro if you have to change anything in the databse please relect it on teh scheam so that the schma must be latest 

@@ -83,7 +83,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
   const [workspacePossibility, setWorkspacePossibility] = useState('');
   const [workspaceRootCause, setWorkspaceRootCause] = useState('');
   const [workspaceSupportNote, setWorkspaceSupportNote] = useState('');
-  const [workspaceStatus, setWorkspaceStatus] = useState<TicketStatus>('Open');
   const [savingWorkspace, setSavingWorkspace] = useState(false);
   const [workspaceSuccessMsg, setWorkspaceSuccessMsg] = useState<string | null>(null);
 
@@ -180,11 +179,10 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
       setWorkspacePossibility(ticket.future_possibility || '');
       setWorkspaceRootCause(ticket.root_cause || '');
       setWorkspaceSupportNote(ticket.support_note || '');
-      setWorkspaceStatus(ticket.status || 'Open');
     }
   }, [ticket]);
 
-  const handleSaveWorkspace = async (onlyStatus = false) => {
+  const handleSaveWorkspace = async () => {
     if (!ticket) return;
     try {
       setSavingWorkspace(true);
@@ -198,14 +196,13 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
           future_possibility: workspacePossibility,
           root_cause: workspaceRootCause,
           support_note: workspaceSupportNote,
-          status: workspaceStatus,
         },
         currentUser.name,
         currentUser.role
       );
       setTicket(updated);
       onTicketUpdated(updated);
-      setWorkspaceSuccessMsg(onlyStatus ? 'Ticket status updated.' : 'Support Workspace saved successfully!');
+      setWorkspaceSuccessMsg('Support Workspace saved successfully!');
       setTimeout(() => setWorkspaceSuccessMsg(null), 3000);
     } catch (err: any) {
       alert(err.message || 'Failed to save support workspace');
@@ -590,47 +587,17 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                   />
                 </div>
 
-                {/* Status Control */}
-                <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-3 shadow-xs">
-                  <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">
-                    Status Control
-                  </span>
-
-                  <div className="space-y-1">
-                    <select
-                      value={workspaceStatus}
-                      onChange={(e) => setWorkspaceStatus(e.target.value as TicketStatus)}
-                      disabled={savingWorkspace}
-                      className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 cursor-pointer shadow-xs"
-                    >
-                      <option value="Open">Open</option>
-                      <option value="Under Review">Under Review</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Pending Customer Close">Pending Customer Close</option>
-                      <option value="Closed">Closed</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleSaveWorkspace(true)}
-                      disabled={savingWorkspace}
-                      className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      {savingWorkspace ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
-                      <span>Update Status</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSaveWorkspace(false)}
-                      disabled={savingWorkspace}
-                      className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      {savingWorkspace ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                      <span>Save Workspace</span>
-                    </button>
-                  </div>
+                {/* Save Workspace Action */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveWorkspace}
+                    disabled={savingWorkspace}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {savingWorkspace ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    <span>Save Workspace</span>
+                  </button>
                 </div>
               </div>
             ) : (

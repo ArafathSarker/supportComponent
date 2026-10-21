@@ -1,1 +1,13 @@
-remove this from ticket and remove the ticket status from support workspace please because it causes duplicate called Status Control in that tab means only remove that part but the saving workspace will be the same bro if you have to change anything in the databse please relect it on teh scheam so that the schma must be latest 
+here look closely in the visiting log and report
+Action Checklist
+5 Tasks
+•
+Inspect and align optical needle sensor on sewing line
+•
+Calibrate RS485 impedance and line termination resistors
+•
+Test factory floor LoRaWAN edge gateway signal strength
++2 more tasks...
+
+
+here +2 more I can't see them initially it is good do that way +2 but if any one click there they should see the others like it can be +2 , +3 , any thing ok

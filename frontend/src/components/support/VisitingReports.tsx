@@ -21,7 +21,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import type { VisitingReport, CurrentUser, VisitChecklistItem } from './types';
 import { api } from './api';
@@ -47,6 +49,16 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
 
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [selectedVisitForAck, setSelectedVisitForAck] = useState<VisitingReport | null>(null);
+
+  // Expanded checklist tasks state for interactive cards
+  const [expandedChecklists, setExpandedChecklists] = useState<Record<string, boolean>>({});
+
+  const toggleChecklistExpand = (reportId: string) => {
+    setExpandedChecklists((prev) => ({
+      ...prev,
+      [reportId]: !prev[reportId],
+    }));
+  };
 
   // Completion modal with Checklist resolution
   const [completeModalVisit, setCompleteModalVisit] = useState<VisitingReport | null>(null);
@@ -342,6 +354,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 const checklistItems = report.visit_checklist || [];
                 const solvedCount = checklistItems.filter((i) => i.status === 'solved').length;
                 const totalChecklist = checklistItems.length;
+                const isExpanded = Boolean(expandedChecklists[report.id]);
 
                 return (
                   <div
@@ -417,15 +430,27 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
 
                       {/* Action Checklist Summary */}
                       <div className="mt-3 space-y-1">
-                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
-                          <span className="flex items-center gap-1">
+                        <div 
+                          className={`flex items-center justify-between text-[11px] font-semibold text-slate-700 ${
+                            totalChecklist > 3 ? 'cursor-pointer select-none group' : ''
+                          }`}
+                          onClick={() => {
+                            if (totalChecklist > 3) {
+                              toggleChecklistExpand(report.id);
+                            }
+                          }}
+                          title={totalChecklist > 3 ? (isExpanded ? 'Click to show fewer tasks' : 'Click to view all tasks') : undefined}
+                        >
+                          <span className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
                             <ListTodo size={12} className="text-indigo-600" />
                             <span>Action Checklist</span>
                           </span>
                           {totalChecklist > 0 && (
-                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold transition-colors ${
                               report.status === 'Completed'
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : isExpanded
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                                 : 'bg-slate-100 text-slate-600'
                             }`}>
                               {report.status === 'Completed' 
@@ -436,21 +461,39 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         </div>
 
                         {checklistItems.length > 0 ? (
-                          <div className="space-y-1 max-h-24 overflow-y-auto pt-0.5">
-                            {checklistItems.slice(0, 3).map((item, idx) => (
+                          <div className={`space-y-1 pt-0.5 transition-all ${
+                            isExpanded ? 'max-h-60 overflow-y-auto pr-1' : ''
+                          }`}>
+                            {(isExpanded ? checklistItems : checklistItems.slice(0, 3)).map((item, idx) => (
                               <div key={item.id || idx} className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-tight">
                                 <span className={`mt-0.5 shrink-0 ${
-                                  item.status === 'solved' ? 'text-emerald-600' : 'text-slate-400'
+                                  item.status === 'solved' ? 'text-emerald-600 font-bold' : 'text-slate-400'
                                 }`}>
                                   {item.status === 'solved' ? '✓' : '•'}
                                 </span>
-                                <span className="truncate">{item.task}</span>
+                                <span className={isExpanded ? 'break-words leading-tight' : 'truncate'}>{item.task}</span>
                               </div>
                             ))}
                             {checklistItems.length > 3 && (
-                              <span className="text-[10px] text-slate-400 block italic">
-                                +{checklistItems.length - 3} more tasks...
-                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleChecklistExpand(report.id);
+                                }}
+                                className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 pt-0.5 transition-colors group cursor-pointer focus:outline-none"
+                              >
+                                <span>
+                                  {isExpanded
+                                    ? 'Show less'
+                                    : `+${checklistItems.length - 3} more tasks...`}
+                                </span>
+                                {isExpanded ? (
+                                  <ChevronUp size={12} className="group-hover:-translate-y-0.5 transition-transform" />
+                                ) : (
+                                  <ChevronDown size={12} className="group-hover:translate-y-0.5 transition-transform" />
+                                )}
+                              </button>
                             )}
                           </div>
                         ) : (
@@ -538,6 +581,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                     const totalVisitors = report.total_visitors || 1;
                     const checklistItems = report.visit_checklist || [];
                     const solvedCount = checklistItems.filter((i) => i.status === 'solved').length;
+                    const isExpanded = Boolean(expandedChecklists[report.id]);
 
                     return (
                       <tr key={report.id} className="hover:bg-slate-50/80 transition-colors">
@@ -569,13 +613,34 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                             </a>
                           )}
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 align-top">
                           {checklistItems.length > 0 ? (
-                            <span className="text-xs text-slate-700 font-medium">
-                              {report.status === 'Completed' 
-                                ? `${solvedCount} / ${checklistItems.length} Solved` 
-                                : `${checklistItems.length} Checklist Tasks`}
-                            </span>
+                            <div className="space-y-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleChecklistExpand(report.id)}
+                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <span>
+                                  {report.status === 'Completed' 
+                                    ? `${solvedCount} / ${checklistItems.length} Solved` 
+                                    : `${checklistItems.length} Checklist Tasks`}
+                                </span>
+                                {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                              </button>
+                              {isExpanded && (
+                                <div className="mt-1.5 p-2 bg-slate-50 rounded-lg border border-slate-200 space-y-1 max-h-40 overflow-y-auto text-[11px] text-slate-600 shadow-inner">
+                                  {checklistItems.map((item, idx) => (
+                                    <div key={item.id || idx} className="flex items-start gap-1.5 leading-tight">
+                                      <span className={`mt-0.5 shrink-0 ${item.status === 'solved' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                                        {item.status === 'solved' ? '✓' : '•'}
+                                      </span>
+                                      <span className="break-words">{item.task}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-xs text-slate-500 truncate max-w-xs block">
                               {report.purpose}

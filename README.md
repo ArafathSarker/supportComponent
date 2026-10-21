@@ -1,141 +1,55 @@
 # 🎫 Plug-and-Play Support & Visiting Component
 
-A modern, full-stack, modular **Support Ticket & Factory Visiting Management Component** designed for enterprise web applications, IoT solutions, and SCADA platforms.
+A modern, complete, and production-ready **Support Ticket & Field Visiting Management System** designed to be **copied and pasted directly into ANY project** (React, Vite, Next.js, Django, Node.js, etc.).
 
-Styled with **Tailwind CSS v3**, backed by **Django (Python)**, **Django REST Framework**, **Django Channels (WebSockets)**, and **PostgreSQL / SQLite**.
-
----
-
-## ⚡ Highlights
-
-- **Pure Plug-and-Play**: Copy `frontend/src/components/support` into any React / Vite / Next.js project and import `<SupportTicketModule />`.
-- **Styled with Tailwind CSS v3**: Clean, customizable utility classes with dark obsidian/navy aesthetics matching industrial dashboards.
-- **Two Distinct Pages & Modules**:
-  1. **Support Tickets**:
-     - **Company Owner (`company_admin`)**: Raise support tickets with IoT machine details, **edit ticket details later** via dedicated Edit modal, upload evidence photos/videos, live chat via WebSocket, and *has exclusive authority to close resolved tickets* (with star rating & remarks).
-     - **Solution Provider (`super_admin`)**: Can check/monitor available support tickets, triage tickets, update status (`Under Review`, `In Progress`, `Pending Customer Close`), and live chat. *Super Admin cannot raise support tickets (button removed) and cannot close tickets directly.*
-     - **Real-Time WebSocket Chat & Notifications**: Instant live chat per ticket room (`/ws/tickets/{ticket_id}`) with typing indicator, sender badges, and attachments, plus global live table sync (`/ws/notifications`).
-  2. **Visiting Report / Visiting Log**:
-     - **Company Admin ("Visiting Report")**: View on-site engineer visit requests dispatched by the solution provider and **Acknowledge Visit** with gate pass details and escort instructions.
-     - **Super Admin ("Visiting Log")**: Schedule and dispatch factory visit requests to client facilities (specifying engineers, date, duration, PPE requirements) and log post-visit service findings upon completion.
-- **Role System**: Easily switch perspectives between Company Owner and Super Admin via the 1-click tester banner (persisted in `localStorage`).
+Built with **React 19 / 18 + Tailwind CSS v3** on the frontend, backed by **Django REST Framework + Django Channels (WebSockets)** and **PostgreSQL / SQLite**.
 
 ---
 
-## 🚀 Running the Backend (Django + Channels)
+## 🌟 What Does This Component Do?
 
-### Local Development:
-```bash
-# Activate virtual environment
-source backend/venv/bin/activate
+1. **Support Tickets Desk**:
+   - **Raise Tickets**: Clients can report issues with priority, IoT system, error descriptions, and photo/video attachments.
+   - **Edit Tickets Later**: Clients can edit open tickets if machine symptoms change.
+   - **Live Chat Drawer**: Real-time WebSocket chat room per ticket with file attachments and typing indicators.
+   - **Support Workspace (Diagnostic Triage)**: Solution providers can assign field engineers, record root cause, occurrence frequency, and checklist diagnostics.
+   - **Role-Gated Resolution**: Only the client/company owner can formally **Close** the ticket with a 1-5 star rating and feedback remarks.
 
-# Run migrations
-python backend/manage.py migrate
-
-# Start ASGI server (HTTP + WebSockets)
-python -m daphne -b 0.0.0.0 -p 8000 config.asgi:application
-# or
-python backend/manage.py runserver 0.0.0.0:8000
-```
-
-### Running Backend Tests:
-```bash
-source backend/venv/bin/activate
-pytest backend/tests/ -v
-```
+2. **Field Visiting Log & Visiting Report**:
+   - **Schedule Visits**: Solution providers dispatch field engineers to client factories with scheduled dates, lead engineer contact, PPE requirements, and an **Action Checklist**.
+   - **Client Acknowledgement**: Company owners review the delegation, assign an escort engineer, and generate gate passes.
+   - **Interactive Action Checklist**: Concise 3-task view with clickable `+N more tasks...` to dynamically expand all tasks and `Show less` to collapse.
+   - **Resolution Logging**: Field engineers log completed visits and mark each checklist item as *Solved* or *Unsolved*.
 
 ---
 
-## 🏛️ Clean Modular Backend Architecture
+## ⚡ 3-Minute Frontend Quickstart (Plug & Play)
 
+You can drop this component into **any React, Vite, or Next.js application** in 3 simple steps:
+
+### Step 1: Copy the Component Folder
+Copy the folder:
 ```
-backend/
-├── config/                      # Project Configuration Root
-│   ├── asgi.py                  # Daphne/Channels entrypoint (HTTP + WebSockets)
-│   ├── settings.py              # Environment configuration & DB fallback
-│   ├── urls.py                  # Root URLconf (aggregates all app URLs + media)
-│   └── wsgi.py                  # WSGI entrypoint
-│
-├── apps/                        # Domain-Driven Modular Apps
-│   ├── core/                    # Infrastructure, events & code generators
-│   │   ├── events.py            # Real-time WebSocket broadcasting service
-│   │   └── utils.py             # Code generators (TCK-..., VIS-...)
-│   │
-│   ├── tickets/                 # Support Tickets Domain
-│   │   ├── models.py            # Ticket, TicketAttachment models
-│   │   ├── serializers.py       # DRF serializers (List, Detail, Update)
-│   │   ├── services.py          # TicketService (business rules, audit trails)
-│   │   ├── views.py             # Clean API views (Stats, CRUD, Status, Close, Reopen)
-│   │   ├── urls.py              # /api/tickets/
-│   │   └── admin.py             # Django Admin registration
-│   │
-│   ├── chat/                    # Real-time Chat & WebSockets Domain
-│   │   ├── consumers.py         # TicketChatConsumer, NotificationConsumer
-│   │   ├── models.py            # TicketMessage model
-│   │   ├── routing.py           # /ws/tickets/<id> and /ws/notifications
-│   │   ├── serializers.py       # Message serializers
-│   │   ├── services.py          # ChatService (dispatching & notifications)
-│   │   ├── views.py             # Message views
-│   │   └── admin.py
-│   │
-│   ├── visiting/                # Field Visiting Reports Domain
-│   │   ├── models.py            # VisitingReport model
-│   │   ├── serializers.py       # Report serializers
-│   │   ├── services.py          # VisitingReportService (Schedule, Ack, Complete)
-│   │   ├── views.py             # Visiting views
-│   │   ├── urls.py              # /api/visiting/
-│   │   └── admin.py
-│   │
-│   └── uploads/                 # File / Media Upload Domain
-│       ├── views.py             # Multi-part upload handler
-│       └── urls.py              # /api/upload
-│
-├── tests/                       # Modular Pytest Test Suite
-│   ├── conftest.py              # Shared fixtures
-│   ├── test_health.py           # API health check
-│   ├── test_tickets.py          # Ticket lifecycle & permission rules
-│   ├── test_chat.py             # Real-time chat & WebSocket messages
-│   ├── test_visiting.py         # Visiting reports workflow
-│   └── test_uploads.py          # Evidence upload tests
-│
-├── manage.py                    # Django management script
-├── Dockerfile                   # Production container definition
-└── requirements.txt             # Locked Python dependencies
+frontend/src/components/support/
 ```
+into your project's component directory (e.g., `src/components/support/`).
 
----
-
-## 🐳 Running with Docker & Docker Compose
-
-To start PostgreSQL, Django ASGI backend, and Nginx frontend together:
+### Step 2: Install the Single Dependency
+The component only requires [lucide-react](https://lucide.dev) for icons:
 
 ```bash
-sudo docker compose up --build -d
+npm install lucide-react
 ```
 
-- **Frontend App (Nginx)**: [http://localhost:3000](http://localhost:3000)
-- **Django API**: [http://localhost:8000/api/](http://localhost:8000/api/)
-- **Django Admin**: [http://localhost:8000/admin/](http://localhost:8000/admin/)
-- **PostgreSQL Database**: Port `5432` (or `5433` if port 5432 is occupied)
+Make sure **Tailwind CSS v3** is installed in your project and includes the component in your `tailwind.config.js`:
 
----
-
-## 📦 How to Integrate into Any React / Next.js App
-
-### Step 1: Copy Component Files
-Copy the `src/components/support/` folder into your project.
-
-### Step 2: Ensure Tailwind CSS is configured
-Make sure your project has Tailwind CSS v3 installed and your `tailwind.config.js` includes the component path:
-
-```js
+```javascript
 // tailwind.config.js
 module.exports = {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class',
   theme: {
     extend: {},
   },
@@ -143,69 +57,238 @@ module.exports = {
 }
 ```
 
-### Step 3: Mount the Component
+### Step 3: Drop `<SupportTicketModule />` into Any Page
 
 ```tsx
 import React from 'react';
 import { SupportTicketModule } from './components/support';
 
-export function DashboardPage() {
+export default function SupportPage() {
   return (
-    <div className="min-h-screen bg-[#0b0f19] p-6">
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       <SupportTicketModule
-        role="company_admin" // or 'super_admin'
+        // Connect to your backend API & WebSocket
+        apiUrl="http://localhost:8000/api"
+        wsUrl="ws://localhost:8000/ws"
+
+        // Pass the logged-in user details
         currentUser={{
           id: 'usr-101',
           name: 'Arafath',
-          role: 'company_admin',
+          role: 'company_admin', // 'company_admin' (Client) or 'super_admin' (Provider)
           company_name: 'CSI Smart Tech Ltd',
           email: 'arafath@example.com'
         }}
+
         brandName="CSI Smart Tech Ltd"
-        apiUrl="http://localhost:8000/api"
-        wsUrl="ws://localhost:8000/ws"
-        showRoleSwitcher={true} // toggle off in production with real auth
+
+        // Set to false in production to hide the 1-click role testing banner
+        showRoleSwitcher={true}
+
+        // (Optional) Customize categories for your domain
         categories={[
           'Hardware / Sensor / Device Problem',
-          'Software / Firmware / App Bug',
-          'Network / Connectivity Issue',
-          'Data / Export / Reporting Issue',
-          'SCADA / Dashboard / Display Issue',
-          'User Account / Access / Permission',
-          'Billing / Subscription / License',
-          'Installation / Commissioning',
-          'Other / General Enquiry'
+          'Software / Firmware Bug',
+          'Network / Gateway Connectivity',
+          'SCADA / Telemetry Display Issue',
+          'Account / Permissions',
+          'General Enquiry'
         ]}
+
+        // (Optional) Customize IoT machines or systems
         systems={[
-          'Water Flow Monitoring',
-          'Main Electrical Substation SCADA',
-          'Boiler Telemetry Unit',
-          'Energy Meter Gateway',
-          'Chiller Sensor Line'
+          'Sewing Line Sensor Array',
+          'Main Substation SCADA Unit',
+          'Chiller Telemetry Unit',
+          'Edge LoRaWAN Gateway',
+          'Factory Boiler Controller'
         ]}
-        onTicketCreated={(ticket) => console.log('New ticket:', ticket)}
-        onTicketClosed={(ticketId) => console.log('Closed ticket:', ticketId)}
+
+        onTicketCreated={(ticket) => console.log('Created:', ticket)}
+        onTicketClosed={(id) => console.log('Closed ticket:', id)}
       />
     </div>
   );
 }
 ```
 
+That's it! All ticket modals, chat drawers, visiting logs, pagination, search, and expandable checklists are fully self-contained.
+
 ---
 
-## 🛠️ Props & Customization API
+## 🛠️ Props & Customization Reference
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `role` | `'company_admin' \| 'super_admin'` | `'company_admin'` | Active role perspective (read from `localStorage`) |
-| `activeTab` | `'tickets' \| 'visiting'` | `'tickets'` | Controlled tab view |
-| `onTabChange` | `(tab) => void` | `undefined` | Tab change callback |
-| `currentUser` | `CurrentUser` | Default mock user | Current user details (id, name, role, company_name) |
-| `apiUrl` | `string` | Auto-detected / `/api` | Base URL for REST API |
-| `wsUrl` | `string` | Auto-detected / `/ws` | Base WebSocket URL for real-time live chat |
-| `brandName` | `string` | `'CSI Smart Tech Ltd'` | Organization or brand name displayed |
-| `showRoleSwitcher` | `boolean` | `true` | Show/hide the top 1-click role switcher banner |
-| `categories` | `string[]` | Default 9 categories | Customizable list of problem categories |
-| `systems` | `string[]` | Default IoT systems | Customizable list of affected systems/solutions |
-| `onTicketCreated` | `(ticket) => void` | `undefined` | Callback when a new ticket is raised |
-| `onTicketClosed` | `(ticketId) => void` | `undefined` | Callback when a ticket is closed |
+| `currentUser` | `CurrentUser` | Required | Current user: `{ id, name, role, company_name, email }` |
+| `role` | `'company_admin' \| 'super_admin'` | `'company_admin'` | User role perspective (`company_admin` = Client, `super_admin` = Provider) |
+| `apiUrl` | `string` | Auto-detected | Base HTTP API URL (e.g. `http://localhost:8000/api` or `/api`) |
+| `wsUrl` | `string` | Auto-detected | Base WebSocket URL (e.g. `ws://localhost:8000/ws` or `/ws`) |
+| `brandName` | `string` | `'CSI Smart Tech Ltd'` | Organization or tenant brand name |
+| `showRoleSwitcher`| `boolean` | `true` | Displays top banner to test between Client and Admin perspectives |
+| `activeTab` | `'tickets' \| 'visiting'` | `'tickets'` | Tab to display (`tickets` or `visiting`) |
+| `onTabChange` | `(tab) => void` | `undefined` | Callback fired when tab switches |
+| `categories` | `string[]` | 9 defaults | List of selectable issue categories in the Raise Ticket modal |
+| `systems` | `string[]` | 5 defaults | List of affected machine systems / assets |
+| `onTicketCreated`| `(ticket) => void` | `undefined` | Callback fired when a new ticket is submitted |
+| `onTicketUpdated`| `(ticket) => void` | `undefined` | Callback fired when a ticket or workspace is updated |
+| `onTicketClosed` | `(ticketId) => void` | `undefined` | Callback fired when customer closes a ticket |
+
+---
+
+## 🚀 Running the Backend (Django + Channels)
+
+The backend provides high-performance REST APIs and real-time WebSockets using Django Channels and Daphne.
+
+### Option A: Local Python Environment
+
+```bash
+# 1. Navigate to backend directory
+cd backend
+
+# 2. Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Run database migrations (works out of the box with SQLite or PostgreSQL)
+python manage.py migrate
+
+# 5. Start ASGI server (handles both HTTP REST and WebSockets)
+python -m daphne -b 0.0.0.0 -p 8000 config.asgi:application
+```
+
+> **Note on Database**: If PostgreSQL is not configured, the backend automatically falls back to local SQLite (`support.db`). You do not need to configure anything to test immediately!
+
+### Run Automated Tests
+```bash
+source backend/venv/bin/activate
+pytest backend/tests/ -v
+```
+
+---
+
+## 🐳 Running with Docker (1-Command Full Stack)
+
+To run PostgreSQL, Django API (Daphne), and the React frontend together:
+
+```bash
+docker compose up --build -d
+```
+
+| Service | Address | Description |
+|---|---|---|
+| **Frontend UI** | [http://localhost:3000](http://localhost:3000) | React App served via Nginx |
+| **Backend REST API** | [http://localhost:8000/api/](http://localhost:8000/api/) | Django REST Framework |
+| **WebSockets** | `ws://localhost:8000/ws/` | Django Channels (Daphne) |
+| **Django Admin** | [http://localhost:8000/admin/](http://localhost:8000/admin/) | Admin panel |
+| **PostgreSQL DB** | `localhost:5433` | Database: `support_db` (user/pass: `postgres`) |
+
+To stop containers:
+```bash
+docker compose down
+```
+
+---
+
+## 🗄️ Database Schemas (Using with Node.js, Go, or Custom Backends)
+
+If your existing project uses **Node.js (Express, Nest, Next.js API routes), Go, or FastAPI**, you can use the pre-built schema files in `scripts/`:
+
+- **Raw PostgreSQL Schema**: [`scripts/schema.sql`](file:///home/arafath/supportComponent/scripts/schema.sql)
+  - Contains complete `CREATE TABLE` statements for `support_tickets`, `ticket_messages`, `ticket_attachments`, and `visiting_reports`.
+- **Node.js / JavaScript Schema**: [`scripts/schema.mjs`](file:///home/arafath/supportComponent/scripts/schema.mjs)
+  - Ready for Knex, Drizzle, Prisma, or TypeORM.
+- **Database Initializer Scripts**:
+  - Node.js: `node scripts/db-init.mjs`
+  - Python: `python scripts/db_init.py`
+
+### Database Tables Overview:
+1. `support_tickets`: Stores ticket code (`TCK-YYYYMMDD-XXXX`), system, category, urgency, priority, status, diagnostics (occurrence, root cause, checklist, assigned engineer), and customer rating.
+2. `ticket_messages`: Real-time chat messages linked to a ticket (`sender_name`, `sender_role`, `message`, `attachment_url`).
+3. `ticket_attachments`: Files and evidence photos attached to tickets.
+4. `visiting_reports`: Scheduled field visits (`VIS-YYYYMMDD-XXXX`), delegation lead engineer, phone, date, purpose, `visit_checklist` (JSON), and acknowledgement state.
+
+---
+
+## 📡 REST API Reference
+
+All endpoints accept standard JSON and return structured responses:
+
+### 🎫 Tickets API (`/api/tickets/`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/tickets/` | List tickets with filters (`?role=...&companyName=...&status=...&priority=...&search=...`) |
+| `POST` | `/api/tickets/` | Create a new support ticket |
+| `GET` | `/api/tickets/stats/` | Get ticket counts (Open, In Progress, Solved, Critical) |
+| `GET` | `/api/tickets/{id}/` | Get full ticket details with messages and attachments |
+| `PATCH` | `/api/tickets/{id}/` | Update ticket details or Super Admin diagnostic workspace |
+| `POST` | `/api/tickets/{id}/close/` | Close ticket (requires `rating` 1-5 and `remarks`) - **Client only** |
+| `POST` | `/api/tickets/{id}/reopen/` | Reopen a previously closed ticket |
+
+### 💬 Chat & Messages API (`/api/tickets/{id}/messages/`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/tickets/{id}/messages/` | Retrieve message history for a ticket |
+| `POST` | `/api/tickets/{id}/messages/` | Post a chat message with optional attachment |
+
+### 🚗 Visiting Reports API (`/api/visiting/`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/visiting/` | List visiting reports with role/company filtering |
+| `POST` | `/api/visiting/` | Schedule a new visit (delegation lead, date, checklist) |
+| `POST` | `/api/visiting/{id}/acknowledge/` | Acknowledge visit (gate pass info, escort engineer) |
+| `POST` | `/api/visiting/{id}/complete/` | Complete visit with itemized checklist resolution |
+
+### 📁 Uploads API (`/api/upload/`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/upload/` | Multipart file upload (returns public URL for attachments) |
+
+---
+
+## 🔌 WebSocket Channels Reference
+
+- **Ticket Chat Room**: `ws://<host>/ws/tickets/<ticket_id>/`
+  - Broadcasts live chat messages, typing events, and attachments to anyone inside the drawer.
+- **Global Table Notifications**: `ws://<host>/ws/notifications/`
+  - Broadcasts ticket creations, status changes, and visiting updates to automatically refresh tables across all connected users in real time.
+
+---
+
+## 💡 Role Permissions (At a Glance)
+
+| Feature | Company Admin (Client) | Super Admin (Provider) |
+|---|:---:|:---:|
+| Raise New Ticket | ✅ Yes | ❌ No (Provider cannot raise) |
+| Edit Open Ticket | ✅ Yes | ❌ No |
+| Live Chat Drawer | ✅ Yes | ✅ Yes |
+| Super Admin Workspace (Diagnostics) | ❌ Hidden | ✅ Yes (Lead engineer, root cause, triage) |
+| Close Resolved Ticket | ✅ **Exclusive Authority** | ❌ Cannot close directly |
+| Schedule Visiting Engineer | ❌ No | ✅ Yes |
+| Acknowledge Visiting Delegation | ✅ Yes | ❌ No |
+| Complete & Resolve Visit Checklist | ❌ No | ✅ Yes |
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+### 1. Can I use this without Docker?
+**Yes.** You can run the backend with standard `python -m daphne -b 0.0.0.0 -p 8000 config.asgi:application` and the frontend with `npm run dev` in Vite or inside your existing Next.js / Create-React-App project.
+
+### 2. Can I use SQLite instead of PostgreSQL?
+**Yes.** SQLite is built-in. If no `DATABASE_URL` is provided, Django defaults to local `support.db` automatically.
+
+### 3. Why are Tailwind CSS classes not showing up in my app?
+Ensure your `tailwind.config.js` `content` array includes the path where you copied the support component:
+`"./src/components/support/**/*.{js,ts,jsx,tsx}"`
+
+### 4. How do I disable the test role switcher in production?
+Pass `showRoleSwitcher={false}` to `<SupportTicketModule />`. The component will strictly respect the role passed in `currentUser.role`.
+
+---
+
+## 📄 License
+MIT License. Free to use, adapt, and integrate into any commercial or open-source software project.

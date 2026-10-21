@@ -5,6 +5,7 @@ from .views import (
     TicketListCreateView,
     TicketDetailUpdateView,
     TicketStatusUpdateView,
+    TicketWorkspaceUpdateView,
     TicketCloseView,
     TicketReopenView,
 )
@@ -17,6 +18,8 @@ urlpatterns = [
     path('<str:ticket_id>/', TicketDetailUpdateView.as_view(), name='ticket-detail-update-slash'),
     path('<str:ticket_id>/status', TicketStatusUpdateView.as_view(), name='ticket-status-update'),
     path('<str:ticket_id>/status/', TicketStatusUpdateView.as_view(), name='ticket-status-update-slash'),
+    path('<str:ticket_id>/workspace', TicketWorkspaceUpdateView.as_view(), name='ticket-workspace-update'),
+    path('<str:ticket_id>/workspace/', TicketWorkspaceUpdateView.as_view(), name='ticket-workspace-update-slash'),
     path('<str:ticket_id>/close', TicketCloseView.as_view(), name='ticket-close'),
     path('<str:ticket_id>/close/', TicketCloseView.as_view(), name='ticket-close-slash'),
     path('<str:ticket_id>/reopen', TicketReopenView.as_view(), name='ticket-reopen'),

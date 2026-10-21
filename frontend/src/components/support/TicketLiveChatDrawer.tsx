@@ -4,6 +4,7 @@ import {
   Send, 
   Paperclip, 
   CheckCircle, 
+  CheckCircle2,
   RotateCcw, 
   Clock, 
   Download, 
@@ -22,7 +23,12 @@ import {
   Maximize2,
   Eye,
   Loader2,
-  Tag
+  Tag,
+  ListChecks,
+  Save,
+  Shield,
+  Wrench,
+  AlertTriangle
 } from 'lucide-react';
 import type { Ticket, TicketMessage, CurrentUser, TicketStatus } from './types';
 import { api } from './api';
@@ -64,6 +70,23 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
   const [closeNotes, setCloseNotes] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [mobileDrawerTab, setMobileDrawerTab] = useState<'chat' | 'details'>('chat');
+  
+  // View Switcher: Client / Requester View vs Support Workspace
+  const [activeViewTab, setActiveViewTab] = useState<'requester' | 'workspace'>(() => {
+    return currentUser.role === 'super_admin' ? 'workspace' : 'requester';
+  });
+
+  // Support Engineer Workspace states
+  const [workspaceSeverity, setWorkspaceSeverity] = useState('');
+  const [workspaceEngineer, setWorkspaceEngineer] = useState('');
+  const [workspaceOccurrence, setWorkspaceOccurrence] = useState('');
+  const [workspacePossibility, setWorkspacePossibility] = useState('');
+  const [workspaceRootCause, setWorkspaceRootCause] = useState('');
+  const [workspaceSupportNote, setWorkspaceSupportNote] = useState('');
+  const [workspaceStatus, setWorkspaceStatus] = useState<TicketStatus>('Open');
+  const [savingWorkspace, setSavingWorkspace] = useState(false);
+  const [workspaceSuccessMsg, setWorkspaceSuccessMsg] = useState<string | null>(null);
+
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingFilePreview, setPendingFilePreview] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -148,11 +171,48 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
     };
   }, [isOpen, ticketId, currentUser.name]);
 
+  // Synchronize workspace form fields when ticket updates
   useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    if (ticket) {
+      setWorkspaceSeverity(ticket.support_severity || '');
+      setWorkspaceEngineer(ticket.assigned_engineer || '');
+      setWorkspaceOccurrence(ticket.occurrence || '');
+      setWorkspacePossibility(ticket.future_possibility || '');
+      setWorkspaceRootCause(ticket.root_cause || '');
+      setWorkspaceSupportNote(ticket.support_note || '');
+      setWorkspaceStatus(ticket.status || 'Open');
     }
-  }, [messages, typingUser, mobileDrawerTab]);
+  }, [ticket]);
+
+  const handleSaveWorkspace = async (onlyStatus = false) => {
+    if (!ticket) return;
+    try {
+      setSavingWorkspace(true);
+      setWorkspaceSuccessMsg(null);
+      const updated = await api.saveTicketWorkspace(
+        ticket.id,
+        {
+          support_severity: workspaceSeverity,
+          assigned_engineer: workspaceEngineer,
+          occurrence: workspaceOccurrence,
+          future_possibility: workspacePossibility,
+          root_cause: workspaceRootCause,
+          support_note: workspaceSupportNote,
+          status: workspaceStatus,
+        },
+        currentUser.name,
+        currentUser.role
+      );
+      setTicket(updated);
+      onTicketUpdated(updated);
+      setWorkspaceSuccessMsg(onlyStatus ? 'Ticket status updated.' : 'Support Workspace saved successfully!');
+      setTimeout(() => setWorkspaceSuccessMsg(null), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save support workspace');
+    } finally {
+      setSavingWorkspace(false);
+    }
+  };
 
   if (!isOpen || !ticket) return null;
 
@@ -356,13 +416,42 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             </div>
           </div>
 
-          <button 
-            type="button" 
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors"
-            onClick={onClose}
-          >
-            <X size={19} />
-          </button>
+          {/* Right Header Controls: Tab Switcher (Client / Requester View vs Support Workspace) + Close */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="inline-flex p-1 bg-slate-200/80 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setActiveViewTab('requester')}
+                className={`px-2.5 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs transition-all ${
+                  activeViewTab === 'requester'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Client / Requester View
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveViewTab('workspace')}
+                className={`px-2.5 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs transition-all ${
+                  activeViewTab === 'workspace'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Support Workspace
+              </button>
+            </div>
+
+            <button 
+              type="button" 
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors"
+              onClick={onClose}
+              aria-label="Close drawer"
+            >
+              <X size={19} />
+            </button>
+          </div>
         </div>
 
         {/* Mobile Tab Switcher */}
@@ -390,7 +479,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             }`}
           >
             <Info size={14} />
-            <span>Details & Evidence</span>
+            <span>{activeViewTab === 'workspace' ? 'Workspace' : 'Details & Evidence'}</span>
           </button>
         </div>
 
@@ -400,254 +489,459 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
           <div className={`md:col-span-5 bg-slate-50/70 border-r border-slate-200 p-4 sm:p-5 overflow-y-auto space-y-4 ${
             mobileDrawerTab === 'details' ? 'block' : 'hidden md:block'
           }`}>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Problem Title
-                </span>
-                {isCompanyAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="inline-flex items-center gap-1 text-[11px] text-amber-700 hover:text-amber-800 font-medium px-2 py-0.5 rounded bg-amber-50 border border-amber-200 shadow-xs"
-                    title="Edit ticket specifications"
-                  >
-                    <Edit3 size={11} />
-                    <span>Edit</span>
-                  </button>
-                )}
-              </div>
-              <h2 className="text-sm font-bold text-slate-900 leading-snug bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-                {ticket.title}
-              </h2>
-            </div>
-
-            {/* System, Category, Floor Grid */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">System</span>
-                <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.affected_system}</span>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Category</span>
-                <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.category}</span>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Factory Floor</span>
-                <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.floor_location || 'Floor N/A'}</span>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Line / Machine</span>
-                <span className="font-semibold text-slate-800 truncate block mt-0.5">
-                  {ticket.line_number || ticket.machine_id || 'Line N/A'}
-                </span>
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Problem Description
-              </span>
-              <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs leading-relaxed text-slate-800 whitespace-pre-wrap max-h-40 overflow-y-auto shadow-xs">
-                {ticket.description}
-              </div>
-            </div>
-
-            {/* Left Sidebar: ONLY Photos & Videos Uploaded at Ticket Creation */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <ImageIcon size={14} className="text-blue-600" />
-                  <span>Ticket Creation Evidence</span>
-                </span>
-                {initialEvidenceAttachments.length > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold">
-                    {initialEvidenceAttachments.length} file{initialEvidenceAttachments.length > 1 ? 's' : ''}
+            {activeViewTab === 'workspace' ? (
+              <div className="space-y-4">
+                <div className="bg-white p-3.5 rounded-xl border border-blue-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Wrench size={14} className="text-blue-600" />
+                      <span>Support Workspace</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Internal triage, severity classification, and root cause diagnostic logs.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                    Staff Only
                   </span>
+                </div>
+
+                {workspaceSuccessMsg && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-in fade-in">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>{workspaceSuccessMsg}</span>
+                  </div>
                 )}
-              </div>
 
-              {initialEvidenceAttachments.length === 0 ? (
-                <div className="p-3.5 bg-white border border-slate-200 rounded-xl text-center text-xs text-slate-400 shadow-xs">
-                  No initial photos or videos attached at ticket creation.
+                {/* Severity Dropdown */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                    <AlertTriangle size={13} className="text-amber-500" />
+                    <span>Support Severity</span>
+                  </label>
+                  <select
+                    value={workspaceSeverity}
+                    onChange={(e) => setWorkspaceSeverity(e.target.value)}
+                    className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs"
+                  >
+                    <option value="">Select</option>
+                    <option value="Critical Outage">Critical Outage</option>
+                    <option value="High Impact">High Impact</option>
+                    <option value="Medium Degraded">Medium Degraded</option>
+                    <option value="Low / Minor">Low / Minor</option>
+                  </select>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {initialEvidenceAttachments.map((att) => {
-                    const isImg = isImageFile(att.file_name, att.file_type);
-                    const isVid = isVideoFile(att.file_name, att.file_type);
-                    const fileUrl = api.getFileUrl(att.file_path);
 
-                    if (isImg) {
-                      return (
-                        <div
-                          key={att.id}
-                          className="group relative bg-white border border-slate-200 hover:border-blue-400 rounded-xl overflow-hidden shadow-xs transition-all"
-                        >
-                          <div 
-                            className="relative h-36 w-full cursor-pointer bg-slate-100 overflow-hidden"
-                            onClick={() => setActiveLightboxImage({ url: fileUrl, title: att.file_name })}
-                          >
-                            <img
-                              src={fileUrl}
-                              alt={att.file_name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = fileUrl;
-                              }}
-                            />
-                            <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                              <span className="p-2 rounded-full bg-blue-600 text-white shadow-md">
-                                <Maximize2 size={16} />
-                              </span>
-                            </div>
-                          </div>
-                          <div className="p-2.5 flex items-center justify-between text-xs text-slate-700 bg-slate-50 border-t border-slate-100">
-                            <div className="truncate mr-2">
-                              <p className="font-semibold text-slate-900 truncate text-[11px]">{att.file_name}</p>
-                              <p className="text-[10px] text-slate-500">
-                                {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Image'} • {att.uploaded_by || 'Evidence'}
-                              </p>
-                            </div>
-                            <a
-                              href={fileUrl}
-                              download={att.file_name}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors shrink-0 shadow-xs"
-                              title="Download image"
-                            >
-                              <Download size={13} />
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (isVid) {
-                      return (
-                        <div
-                          key={att.id}
-                          className="bg-white border border-purple-200 rounded-xl overflow-hidden shadow-xs space-y-1.5 p-2.5"
-                        >
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-900 mb-1">
-                            <Video size={14} className="text-purple-600" />
-                            <span className="truncate">{att.file_name}</span>
-                          </div>
-                          <video
-                            src={fileUrl}
-                            controls
-                            preload="metadata"
-                            className="w-full max-h-44 rounded-lg bg-black border border-slate-200"
-                          />
-                          <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
-                            <span>{att.file_size ? `${(att.file_size / 1024 / 1024).toFixed(1)} MB` : 'Video'}</span>
-                            <a
-                              href={fileUrl}
-                              download={att.file_name}
-                              className="text-purple-700 font-semibold hover:underline flex items-center gap-1"
-                            >
-                              <Download size={11} /> Download Video
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <a
-                        key={att.id}
-                        href={fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between p-2.5 bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-xs text-slate-800 transition-colors shadow-xs group"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <FileText size={15} className="text-blue-600 shrink-0" />
-                          <div className="truncate">
-                            <p className="font-semibold text-slate-900 truncate text-[11px] group-hover:text-blue-600">{att.file_name}</p>
-                            <p className="text-[10px] text-slate-500">{att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Document'}</p>
-                          </div>
-                        </div>
-                        <Download size={13} className="text-slate-400 group-hover:text-slate-800 shrink-0 ml-2" />
-                      </a>
-                    );
-                  })}
+                {/* Assigned Engineer */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                    <Shield size={13} className="text-blue-500" />
+                    <span>Assigned Engineer</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={workspaceEngineer}
+                    onChange={(e) => setWorkspaceEngineer(e.target.value)}
+                    placeholder="Engineer name"
+                    className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs"
+                  />
                 </div>
-              )}
-            </div>
 
-            {/* Workflow Actions Box */}
-            <div className="pt-3 border-t border-slate-200 space-y-3">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                Workflow Actions
-              </span>
-
-              {/* Company Admin View */}
-              {isCompanyAdmin && (
-                <div className="space-y-2">
-                  {ticket.status !== 'Closed' ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowCloseModal(true)}
-                      className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-all flex items-center justify-center gap-2"
-                    >
-                      <CheckCircle size={15} />
-                      <span>Close Ticket (Issue Resolved)</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleReopenTicket}
-                      className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 shadow-sm transition-all flex items-center justify-center gap-2"
-                    >
-                      <RotateCcw size={15} />
-                      <span>Reopen Ticket</span>
-                    </button>
-                  )}
-                  <p className="text-[11px] text-slate-500 leading-tight">
-                    * Company Owner Rule: Only you can formally verify resolution and close this ticket.
-                  </p>
+                {/* Occurrence */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Occurrence
+                  </label>
+                  <input
+                    type="text"
+                    value={workspaceOccurrence}
+                    onChange={(e) => setWorkspaceOccurrence(e.target.value)}
+                    placeholder="First time, Intermittent, Recurring daily"
+                    className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs"
+                  />
                 </div>
-              )}
 
-              {/* Super Admin View */}
-              {isSuperAdmin && (
-                <div className="space-y-3">
+                {/* Future Possibility */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Future Possibility
+                  </label>
+                  <input
+                    type="text"
+                    value={workspacePossibility}
+                    onChange={(e) => setWorkspacePossibility(e.target.value)}
+                    placeholder="Low, Medium, High"
+                    className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs"
+                  />
+                </div>
+
+                {/* Root Cause */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Root Cause
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={workspaceRootCause}
+                    onChange={(e) => setWorkspaceRootCause(e.target.value)}
+                    placeholder="Root cause analysis / diagnostic findings..."
+                    className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs resize-y"
+                  />
+                </div>
+
+                {/* Support Note */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Support Note
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={workspaceSupportNote}
+                    onChange={(e) => setWorkspaceSupportNote(e.target.value)}
+                    placeholder="Internal notes for the support team..."
+                    className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs resize-y"
+                  />
+                </div>
+
+                {/* Status Control */}
+                <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-3 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">
+                    Status Control
+                  </span>
+
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Set Ticket Status:</label>
                     <select
-                      value={ticket.status}
-                      onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
-                      disabled={ticket.status === 'Closed' || updatingStatus}
-                      className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 cursor-pointer shadow-xs"
+                      value={workspaceStatus}
+                      onChange={(e) => setWorkspaceStatus(e.target.value as TicketStatus)}
+                      disabled={savingWorkspace}
+                      className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 cursor-pointer shadow-xs"
                     >
                       <option value="Open">Open</option>
                       <option value="Under Review">Under Review</option>
                       <option value="In Progress">In Progress</option>
                       <option value="Pending Customer Close">Pending Customer Close</option>
-                      <option value="Closed" disabled>
-                        Closed (Consumer/Owner Only)
-                      </option>
+                      <option value="Closed">Closed</option>
                     </select>
                   </div>
 
-                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 flex items-start gap-2">
-                    <ShieldAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      Super Admin can set progress, but final ticket closure is reserved for the factory owner.
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveWorkspace(true)}
+                      disabled={savingWorkspace}
+                      className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {savingWorkspace ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                      <span>Update Status</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveWorkspace(false)}
+                      disabled={savingWorkspace}
+                      className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {savingWorkspace ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                      <span>Save Workspace</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Problem Title
+                    </span>
+                    {isCompanyAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="inline-flex items-center gap-1 text-[11px] text-amber-700 hover:text-amber-800 font-medium px-2 py-0.5 rounded bg-amber-50 border border-amber-200 shadow-xs"
+                        title="Edit ticket specifications"
+                      >
+                        <Edit3 size={11} />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                  </div>
+                  <h2 className="text-sm font-bold text-slate-900 leading-snug bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+                    {ticket.title}
+                  </h2>
+                </div>
+
+                {/* System, Category, Floor Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">System</span>
+                    <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.affected_system}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Category</span>
+                    <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.category}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Factory Floor</span>
+                    <span className="font-semibold text-slate-800 truncate block mt-0.5">{ticket.floor_location || 'Floor N/A'}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Line Number</span>
+                    <span className="font-semibold text-slate-800 truncate block mt-0.5">
+                      {ticket.line_number || 'Line N/A'}
                     </span>
                   </div>
                 </div>
-              )}
-            </div>
+
+                {/* Description */}
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    Problem Description
+                  </span>
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs leading-relaxed text-slate-800 whitespace-pre-wrap max-h-40 overflow-y-auto shadow-xs">
+                    {ticket.description}
+                  </div>
+                </div>
+
+                {/* Pre-Troubleshooting Checklist */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <ListChecks size={14} className="text-emerald-600" />
+                      <span>Pre-Troubleshooting Checklist</span>
+                    </span>
+                    {ticket.troubleshooting_checklist && ticket.troubleshooting_checklist.length > 0 && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+                        {ticket.troubleshooting_checklist.length} Completed
+                      </span>
+                    )}
+                  </div>
+
+                  {ticket.troubleshooting_checklist && ticket.troubleshooting_checklist.length > 0 ? (
+                    <div className="bg-white border border-emerald-100 rounded-xl p-3 space-y-2 shadow-xs">
+                      {ticket.troubleshooting_checklist.map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                          <CheckCircle2 size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                          <span className="leading-snug">{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-400 italic shadow-xs">
+                      No pre-troubleshooting checklist recorded for this ticket.
+                    </div>
+                  )}
+                </div>
+
+                {/* Left Sidebar: ONLY Photos & Videos Uploaded at Ticket Creation */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <ImageIcon size={14} className="text-blue-600" />
+                      <span>Ticket Creation Evidence</span>
+                    </span>
+                    {initialEvidenceAttachments.length > 0 && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold">
+                        {initialEvidenceAttachments.length} file{initialEvidenceAttachments.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {initialEvidenceAttachments.length === 0 ? (
+                    <div className="p-3.5 bg-white border border-slate-200 rounded-xl text-center text-xs text-slate-400 shadow-xs">
+                      No initial photos or videos attached at ticket creation.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {initialEvidenceAttachments.map((att) => {
+                        const isImg = isImageFile(att.file_name, att.file_type);
+                        const isVid = isVideoFile(att.file_name, att.file_type);
+                        const fileUrl = api.getFileUrl(att.file_path);
+
+                        if (isImg) {
+                          return (
+                            <div
+                              key={att.id}
+                              className="group relative bg-white border border-slate-200 hover:border-blue-400 rounded-xl overflow-hidden shadow-xs transition-all"
+                            >
+                              <div 
+                                className="relative h-36 w-full cursor-pointer bg-slate-100 overflow-hidden"
+                                onClick={() => setActiveLightboxImage({ url: fileUrl, title: att.file_name })}
+                              >
+                                <img
+                                  src={fileUrl}
+                                  alt={att.file_name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = fileUrl;
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
+                                  <span className="p-2 rounded-full bg-blue-600 text-white shadow-md">
+                                    <Maximize2 size={16} />
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="p-2.5 flex items-center justify-between text-xs text-slate-700 bg-slate-50 border-t border-slate-100">
+                                <div className="truncate mr-2">
+                                  <p className="font-semibold text-slate-900 truncate text-[11px]">{att.file_name}</p>
+                                  <p className="text-[10px] text-slate-500">
+                                    {att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Image'} • {att.uploaded_by || 'Evidence'}
+                                  </p>
+                                </div>
+                                <a
+                                  href={fileUrl}
+                                  download={att.file_name}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors shrink-0 shadow-xs"
+                                  title="Download image"
+                                >
+                                  <Download size={13} />
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        if (isVid) {
+                          return (
+                            <div
+                              key={att.id}
+                              className="bg-white border border-purple-200 rounded-xl overflow-hidden shadow-xs space-y-1.5 p-2.5"
+                            >
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-900 mb-1">
+                                <Video size={14} className="text-purple-600" />
+                                <span className="truncate">{att.file_name}</span>
+                              </div>
+                              <video
+                                src={fileUrl}
+                                controls
+                                preload="metadata"
+                                className="w-full max-h-44 rounded-lg bg-black border border-slate-200"
+                              />
+                              <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                                <span>{att.file_size ? `${(att.file_size / 1024 / 1024).toFixed(1)} MB` : 'Video'}</span>
+                                <a
+                                  href={fileUrl}
+                                  download={att.file_name}
+                                  className="text-purple-700 font-semibold hover:underline flex items-center gap-1"
+                                >
+                                  <Download size={11} /> Download Video
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <a
+                            key={att.id}
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between p-2.5 bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-xs text-slate-800 transition-colors shadow-xs group"
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <FileText size={15} className="text-blue-600 shrink-0" />
+                              <div className="truncate">
+                                <p className="font-semibold text-slate-900 truncate text-[11px] group-hover:text-blue-600">{att.file_name}</p>
+                                <p className="text-[10px] text-slate-500">{att.file_size ? `${(att.file_size / 1024).toFixed(0)} KB` : 'Document'}</p>
+                              </div>
+                            </div>
+                            <Download size={13} className="text-slate-400 group-hover:text-slate-800 shrink-0 ml-2" />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Workflow Actions Box */}
+                <div className="pt-3 border-t border-slate-200 space-y-3">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Workflow Actions
+                  </span>
+
+                  {/* Company Admin View */}
+                  {isCompanyAdmin && (
+                    <div className="space-y-2">
+                      {ticket.status !== 'Closed' ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowCloseModal(true)}
+                          className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-all flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle size={15} />
+                          <span>Close Ticket (Issue Resolved)</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleReopenTicket}
+                          className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 shadow-sm transition-all flex items-center justify-center gap-2"
+                        >
+                          <RotateCcw size={15} />
+                          <span>Reopen Ticket</span>
+                        </button>
+                      )}
+                      <p className="text-[11px] text-slate-500 leading-tight">
+                        * Company Owner Rule: Only you can formally verify resolution and close this ticket.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Super Admin View */}
+                  {isSuperAdmin && (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">Set Ticket Status:</label>
+                        <select
+                          value={ticket.status}
+                          onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
+                          disabled={ticket.status === 'Closed' || updatingStatus}
+                          className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 cursor-pointer shadow-xs"
+                        >
+                          <option value="Open">Open</option>
+                          <option value="Under Review">Under Review</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Pending Customer Close">Pending Customer Close</option>
+                          <option value="Closed" disabled>
+                            Closed (Consumer/Owner Only)
+                          </option>
+                        </select>
+                      </div>
+
+                      <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 flex items-start gap-2">
+                        <ShieldAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                        <span>
+                          Super Admin can set progress, but final ticket closure is reserved for the factory owner.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Side: Real-Time WebSocket Live Chat (7 Cols on Desktop) */}
           <div className={`md:col-span-7 bg-slate-100/50 flex flex-col h-full overflow-hidden ${
             mobileDrawerTab === 'chat' ? 'flex' : 'hidden md:flex'
           }`}>
+            {/* Real-time correspondence header */}
+            <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-slate-800 tracking-wide uppercase">
+                  Real-Time Support Correspondence
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <span>Live Feed</span>
+              </span>
+            </div>
+
             {/* Chat Thread */}
             <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5" ref={chatScrollRef}>
               {messages.length === 0 && (

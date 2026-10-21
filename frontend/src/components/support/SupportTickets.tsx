@@ -411,14 +411,10 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
 
                       <td className="py-3.5 px-4 text-slate-700">
                         <div className="font-medium text-slate-900">{ticket.affected_system}</div>
-                        {(ticket.line_number || ticket.machine_id) && (
+                        {ticket.line_number && (
                           <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
                             <MapPin size={10} className="shrink-0 text-slate-400" />
-                            <span>
-                              {ticket.line_number || ''}
-                              {ticket.line_number && ticket.machine_id ? ' • ' : ''}
-                              {ticket.machine_id ? `ID: ${ticket.machine_id}` : ''}
-                            </span>
+                            <span>{ticket.line_number}</span>
                           </div>
                         )}
                       </td>
@@ -542,14 +538,10 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
                       <span className="truncate">{ticket.affected_system}</span>
                     </div>
 
-                    {(ticket.line_number || ticket.machine_id) && (
+                    {ticket.line_number && (
                       <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[11px]">
                         <MapPin size={13} className="shrink-0 text-slate-400" />
-                        <span className="truncate">
-                          {ticket.line_number || ''}
-                          {ticket.line_number && ticket.machine_id ? ' • ' : ''}
-                          {ticket.machine_id ? `ID: ${ticket.machine_id}` : ''}
-                        </span>
+                        <span className="truncate">{ticket.line_number}</span>
                       </div>
                     )}
 

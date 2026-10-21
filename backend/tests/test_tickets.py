@@ -224,3 +224,64 @@ def test_garment_iot_dynamic_fields_and_troubleshooting_checklist(client):
     assert updated["production_impact"] == "Full Production Line Stoppage"
     assert updated["iot_details"]["error_code_display"] == "FATAL-LINE-HALT"
 
+
+@pytest.mark.django_db
+def test_ticket_support_workspace(client):
+    """
+    Test Support Workspace diagnostic triage fields update, persistence, and audit logging.
+    """
+    # 1. Create a ticket
+    create_res = client.post(
+        "/api/tickets/",
+        data={
+            "title": "Needle drive erratic motion on Line 12",
+            "description": "Erratic pulse signal detected from servo drive unit.",
+            "affected_system": "Smart Sewing Machine Telemetry",
+            "category": "Sewing Machine IoT Sensor Malfunction",
+            "priority": "High",
+            "created_by_name": "Rahim",
+            "created_by_role": "company_admin",
+            "company_name": "Vintage Denim Studio",
+            "troubleshooting_checklist": ["Checked cable seating", "Power-cycled IoT controller"]
+        },
+        format="json"
+    )
+    assert create_res.status_code == 201
+    ticket_id = create_res.json()["id"]
+
+    # 2. Update workspace triage details via /api/tickets/<id>/workspace/
+    ws_res = client.patch(
+        f"/api/tickets/{ticket_id}/workspace/",
+        data={
+            "support_severity": "Critical Outage",
+            "assigned_engineer": "Nazmul Hossain",
+            "occurrence": "Recurring daily during morning shift",
+            "future_possibility": "High",
+            "root_cause": "Optocoupler PCB solder fracture under high machine vibration",
+            "support_note": "Dispatched replacement sensor unit to Floor 02.",
+            "status": "In Progress",
+            "updated_by_name": "Nazmul",
+            "updated_by_role": "super_admin"
+        },
+        format="json"
+    )
+    assert ws_res.status_code == 200
+    ws_data = ws_res.json()
+    assert ws_data["support_severity"] == "Critical Outage"
+    assert ws_data["assigned_engineer"] == "Nazmul Hossain"
+    assert ws_data["occurrence"] == "Recurring daily during morning shift"
+    assert ws_data["future_possibility"] == "High"
+    assert "Optocoupler PCB" in ws_data["root_cause"]
+    assert "Dispatched replacement" in ws_data["support_note"]
+    assert ws_data["status"] == "In Progress"
+
+    # 3. Retrieve ticket detail to verify persistence and checklist
+    detail_res = client.get(f"/api/tickets/{ticket_id}/")
+    assert detail_res.status_code == 200
+    detail = detail_res.json()
+    assert detail["support_severity"] == "Critical Outage"
+    assert detail["assigned_engineer"] == "Nazmul Hossain"
+    assert len(detail["troubleshooting_checklist"]) == 2
+    assert "Checked cable seating" in detail["troubleshooting_checklist"]
+
+

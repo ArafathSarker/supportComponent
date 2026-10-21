@@ -47,6 +47,12 @@ class TicketListSerializer(serializers.ModelSerializer):
             'machine_id',
             'iot_details',
             'troubleshooting_checklist',
+            'support_severity',
+            'assigned_engineer',
+            'occurrence',
+            'future_possibility',
+            'root_cause',
+            'support_note',
             'description',
             'status',
             'company_name',
@@ -70,7 +76,7 @@ class TicketListSerializer(serializers.ModelSerializer):
 
 class TicketDetailSerializer(serializers.ModelSerializer):
     """
-    Detailed ticket serializer including full chat messages, attachments and IoT telemetry.
+    Detailed ticket serializer including full chat messages, attachments, IoT telemetry, and Support Workspace.
     """
     messages = MessageSerializer(many=True, read_only=True)
     attachments = AttachmentSerializer(many=True, read_only=True)
@@ -93,6 +99,12 @@ class TicketDetailSerializer(serializers.ModelSerializer):
             'machine_id',
             'iot_details',
             'troubleshooting_checklist',
+            'support_severity',
+            'assigned_engineer',
+            'occurrence',
+            'future_possibility',
+            'root_cause',
+            'support_note',
             'description',
             'status',
             'company_name',
@@ -162,3 +174,17 @@ class TicketUpdateSerializer(serializers.Serializer):
     iot_details = serializers.DictField(required=False)
     troubleshooting_checklist = serializers.ListField(child=serializers.CharField(), required=False)
     description = serializers.CharField(required=False)
+
+
+class TicketWorkspaceSerializer(serializers.Serializer):
+    """
+    Validation schema for Support Engineer Workspace diagnostics & status.
+    """
+    support_severity = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    assigned_engineer = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    occurrence = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    future_possibility = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    root_cause = serializers.CharField(required=False, allow_blank=True)
+    support_note = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.CharField(max_length=50, required=False, allow_blank=True)
+

@@ -27,6 +27,13 @@ class Ticket(models.Model):
     created_by_role = models.CharField(max_length=50, default="company_admin")
     iot_details = models.JSONField(default=dict, blank=True)
     troubleshooting_checklist = models.JSONField(default=list, blank=True)
+    # Support Engineer Workspace fields
+    support_severity = models.CharField(max_length=50, blank=True, default="")
+    assigned_engineer = models.CharField(max_length=150, blank=True, default="")
+    occurrence = models.CharField(max_length=100, blank=True, default="")
+    future_possibility = models.CharField(max_length=100, blank=True, default="")
+    root_cause = models.TextField(blank=True, default="")
+    support_note = models.TextField(blank=True, default="")
     closed_at = models.DateTimeField(null=True, blank=True)
     closed_by = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)

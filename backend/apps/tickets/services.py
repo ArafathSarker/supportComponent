@@ -212,6 +212,51 @@ class TicketService:
         return ticket
 
     @staticmethod
+    def save_workspace(ticket: Ticket, data: dict, user_name: str, user_role: str) -> Ticket:
+        """
+        Save Support Engineer Workspace diagnostic details and optional status.
+        Authorized for Super Admin / Support Engineers.
+        """
+        workspace_fields = [
+            'support_severity', 'assigned_engineer', 'occurrence',
+            'future_possibility', 'root_cause', 'support_note'
+        ]
+        changed = False
+        for f in workspace_fields:
+            if f in data:
+                val = data[f]
+                if getattr(ticket, f) != val:
+                    setattr(ticket, f, val)
+                    changed = True
+
+        new_status = data.get('status')
+        if new_status and new_status != ticket.status:
+            if new_status.lower() == 'closed' and user_role == 'super_admin':
+                raise PermissionDenied("Super Admin cannot close the ticket. Only Company Owner/Admin can close the ticket.")
+            ticket.status = new_status
+            if new_status.lower() == 'closed':
+                ticket.closed_at = timezone.now()
+                ticket.closed_by = user_name
+            changed = True
+
+        if changed:
+            ticket.save()
+            from apps.chat.services import ChatService
+            ChatService.create_message(
+                ticket=ticket,
+                sender_name="System",
+                sender_role="system",
+                message=f"Support Workspace updated by {user_name}.",
+                is_system_event=True
+            )
+            from .serializers import TicketDetailSerializer
+            serialized = TicketDetailSerializer(ticket).data
+            broadcast_ticket_event(ticket.id, 'ticket_updated', serialized)
+            broadcast_global_event('ticket_updated', serialized)
+
+        return ticket
+
+    @staticmethod
     def close_ticket(ticket: Ticket, user_name: str, user_role: str, notes: str = None) -> Ticket:
         if user_role == 'super_admin':
             raise PermissionDenied("Super Admin cannot close the ticket. Only Company Owner/Admin can close the ticket.")

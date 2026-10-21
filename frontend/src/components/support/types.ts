@@ -59,6 +59,12 @@ export interface Ticket {
   factory_section?: string;
   iot_details?: Record<string, any>;
   troubleshooting_checklist?: string[];
+  support_severity?: string;
+  assigned_engineer?: string;
+  occurrence?: string;
+  future_possibility?: string;
+  root_cause?: string;
+  support_note?: string;
   description: string;
   status: TicketStatus;
   company_name: string;
@@ -72,6 +78,16 @@ export interface Ticket {
   latest_message?: string;
   messages?: TicketMessage[];
   attachments?: TicketAttachment[];
+}
+
+export interface TicketWorkspacePayload {
+  support_severity?: string;
+  assigned_engineer?: string;
+  occurrence?: string;
+  future_possibility?: string;
+  root_cause?: string;
+  support_note?: string;
+  status?: TicketStatus | string;
 }
 
 export interface TicketStats {

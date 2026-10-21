@@ -154,6 +154,38 @@ class TicketStatusUpdateView(APIView):
         return Response(TicketDetailSerializer(updated_ticket).data, status=status.HTTP_200_OK)
 
 
+class TicketWorkspaceUpdateView(APIView):
+    """
+    PATCH /api/tickets/<id>/workspace/
+    Save Support Engineer Workspace diagnostic details and status.
+    """
+    def patch(self, request, ticket_id):
+        ticket = TicketService.get_ticket(ticket_id)
+        from .serializers import TicketWorkspaceSerializer
+        serializer = TicketWorkspaceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_role = (
+            request.headers.get('x-user-role') or
+            request.data.get('user_role') or
+            request.data.get('role') or
+            'super_admin'
+        )
+        user_name = (
+            request.headers.get('x-user-name') or
+            request.data.get('user_name') or
+            'Support Engineer'
+        )
+
+        updated_ticket = TicketService.save_workspace(
+            ticket=ticket,
+            data=serializer.validated_data,
+            user_name=user_name,
+            user_role=user_role
+        )
+        return Response(TicketDetailSerializer(updated_ticket).data, status=status.HTTP_200_OK)
+
+
 class TicketCloseView(APIView):
     """
     POST /api/tickets/<id>/close

@@ -1,11 +1,12 @@
-import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport, TicketUrgency, TicketPriority } from './types';
+import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport, TicketUrgency, TicketPriority, TicketWorkspacePayload } from './types';
 
 const getDefaultApiBase = (): string => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   if (typeof window !== 'undefined') {
-    if (window.location.port !== '5173') {
-      return `${window.location.origin}/api`;
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:8000/api';
     }
+    return `${window.location.origin}/api`;
   }
   return 'http://localhost:8000/api';
 };
@@ -13,10 +14,11 @@ const getDefaultApiBase = (): string => {
 const getDefaultWsBase = (): string => {
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
   if (typeof window !== 'undefined') {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    if (window.location.port !== '5173') {
-      return `${protocol}//${window.location.host}/ws`;
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'ws://localhost:8000/ws';
     }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}/ws`;
   }
   return 'ws://localhost:8000/ws';
 };
@@ -123,7 +125,15 @@ export class SupportApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || err.error || 'Failed to create ticket');
+      const errorMsg =
+        err.detail ||
+        err.error ||
+        (typeof err === 'object' && Object.keys(err).length > 0
+          ? Object.entries(err)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+              .join(' | ')
+          : `HTTP ${res.status}: ${res.statusText || 'Failed to create ticket'}`);
+      throw new Error(errorMsg);
     }
     return res.json();
   }
@@ -191,6 +201,32 @@ export class SupportApiClient {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || err.error || 'Failed to update ticket status');
+    }
+    return res.json();
+  }
+
+  async saveTicketWorkspace(
+    ticketId: string,
+    payload: TicketWorkspacePayload,
+    userName?: string,
+    userRole?: string
+  ): Promise<Ticket> {
+    const res = await fetch(`${this.apiBase}/tickets/${ticketId}/workspace/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': userRole || 'super_admin',
+        'x-user-name': userName || 'Support Engineer',
+      },
+      body: JSON.stringify({
+        ...payload,
+        user_name: userName,
+        user_role: userRole,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.error || 'Failed to save support workspace');
     }
     return res.json();
   }

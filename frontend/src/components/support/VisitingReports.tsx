@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  MapPin, 
-  User, 
+import {
+  Calendar,
+  MapPin,
+  User,
   Phone,
   Users,
-  CheckCircle2, 
-  Search, 
-  Plus, 
-  RefreshCw, 
-  ShieldCheck, 
+  CheckCircle2,
+  Search,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
   FileCheck2,
   LayoutList,
   LayoutGrid,
@@ -183,7 +183,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
       setCompleting(true);
       const solvedCount = completionChecklist.filter((c) => c.status === 'solved').length;
       const totalCount = completionChecklist.length;
-      const summaryText = completeSummary.trim() || 
+      const summaryText = completeSummary.trim() ||
         `${solvedCount} of ${totalCount} checklist objectives resolved on-site.`;
 
       const updated = await api.completeVisit(
@@ -295,11 +295,10 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 type="button"
                 onClick={() => setViewMode('list')}
                 title="View as List"
-                className={`p-1.5 rounded-md text-xs transition-all ${
-                  viewMode === 'list'
+                className={`p-1.5 rounded-md text-xs transition-all ${viewMode === 'list'
                     ? 'bg-white text-blue-600 shadow-sm font-semibold'
                     : 'text-slate-500 hover:text-slate-800'
-                }`}
+                  }`}
               >
                 <LayoutList size={14} />
               </button>
@@ -307,11 +306,10 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 type="button"
                 onClick={() => setViewMode('grid')}
                 title="View as Grid"
-                className={`p-1.5 rounded-md text-xs transition-all ${
-                  viewMode === 'grid'
+                className={`p-1.5 rounded-md text-xs transition-all ${viewMode === 'grid'
                     ? 'bg-white text-blue-600 shadow-sm font-semibold'
                     : 'text-slate-500 hover:text-slate-800'
-                }`}
+                  }`}
               >
                 <LayoutGrid size={14} />
               </button>
@@ -375,25 +373,23 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         <div className="flex items-center gap-1.5 flex-wrap justify-end">
                           {report.priority && (
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                report.priority === 'Urgent' || report.priority === 'Critical'
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${report.priority === 'Urgent' || report.priority === 'Critical'
                                   ? 'bg-red-50 text-red-700 border-red-200'
                                   : report.priority === 'High'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-blue-50 text-blue-700 border-blue-200'
-                              }`}
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                }`}
                             >
                               {report.priority}
                             </span>
                           )}
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                              report.status === 'Completed'
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${report.status === 'Completed'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : report.status === 'Acknowledged'
-                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}
                           >
                             {report.status}
                           </span>
@@ -430,10 +426,9 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
 
                       {/* Action Checklist Summary */}
                       <div className="mt-3 space-y-1">
-                        <div 
-                          className={`flex items-center justify-between text-[11px] font-semibold text-slate-700 ${
-                            totalChecklist > 3 ? 'cursor-pointer select-none group' : ''
-                          }`}
+                        <div
+                          className={`flex items-center justify-between text-[11px] font-semibold text-slate-700 ${totalChecklist > 3 ? 'cursor-pointer select-none group' : ''
+                            }`}
                           onClick={() => {
                             if (totalChecklist > 3) {
                               toggleChecklistExpand(report.id);
@@ -446,29 +441,26 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                             <span>Action Checklist</span>
                           </span>
                           {totalChecklist > 0 && (
-                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold transition-colors ${
-                              report.status === 'Completed'
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold transition-colors ${report.status === 'Completed'
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : isExpanded
-                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {report.status === 'Completed' 
-                                ? `${solvedCount}/${totalChecklist} Solved` 
+                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}>
+                              {report.status === 'Completed'
+                                ? `${solvedCount}/${totalChecklist} Solved`
                                 : `${totalChecklist} Tasks`}
                             </span>
                           )}
                         </div>
 
                         {checklistItems.length > 0 ? (
-                          <div className={`space-y-1 pt-0.5 transition-all ${
-                            isExpanded ? 'max-h-60 overflow-y-auto pr-1' : ''
-                          }`}>
+                          <div className={`space-y-1 pt-0.5 transition-all ${isExpanded ? 'max-h-60 overflow-y-auto pr-1' : ''
+                            }`}>
                             {(isExpanded ? checklistItems : checklistItems.slice(0, 3)).map((item, idx) => (
                               <div key={item.id || idx} className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-tight">
-                                <span className={`mt-0.5 shrink-0 ${
-                                  item.status === 'solved' ? 'text-emerald-600 font-bold' : 'text-slate-400'
-                                }`}>
+                                <span className={`mt-0.5 shrink-0 ${item.status === 'solved' ? 'text-emerald-600 font-bold' : 'text-slate-400'
+                                  }`}>
                                   {item.status === 'solved' ? '✓' : '•'}
                                 </span>
                                 <span className={isExpanded ? 'break-words leading-tight' : 'truncate'}>{item.task}</span>
@@ -622,8 +614,8 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                                 className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
                               >
                                 <span>
-                                  {report.status === 'Completed' 
-                                    ? `${solvedCount} / ${checklistItems.length} Solved` 
+                                  {report.status === 'Completed'
+                                    ? `${solvedCount} / ${checklistItems.length} Solved`
                                     : `${checklistItems.length} Checklist Tasks`}
                                 </span>
                                 {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -649,13 +641,12 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         </td>
                         <td className="py-3.5 px-4">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
-                              report.status === 'Completed'
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${report.status === 'Completed'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : report.status === 'Acknowledged'
-                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}
                           >
                             {report.status}
                           </span>
@@ -752,11 +743,10 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                       key={pg}
                       type="button"
                       onClick={() => setCurrentPage(pg)}
-                      className={`min-w-[28px] h-7 px-2 rounded text-xs font-semibold transition-all ${
-                        currentPage === pg
+                      className={`min-w-[28px] h-7 px-2 rounded text-xs font-semibold transition-all ${currentPage === pg
                           ? 'bg-blue-600 text-white shadow-xs'
                           : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {pg}
                     </button>
@@ -810,12 +800,12 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
 
       {/* Super Admin Complete Visit Modal with Checklist Resolution (Solved vs Unsolved) */}
       {completeModalVisit && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn" 
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn"
           onClick={() => setCompleteModalVisit(null)}
         >
-          <div 
-            className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl p-6 space-y-4" 
+          <div
+            className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -826,8 +816,8 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                   Log Visit Resolution & Checklist Completion
                 </h3>
               </div>
-              <button 
-                onClick={() => setCompleteModalVisit(null)} 
+              <button
+                onClick={() => setCompleteModalVisit(null)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 <X size={18} />
@@ -859,18 +849,16 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                   return (
                     <div
                       key={item.id || idx}
-                      className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
-                        isSolved 
-                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950' 
+                      className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${isSolved
+                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
                           : 'bg-amber-50/70 border-amber-200 text-amber-950'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start gap-2.5 flex-1 pr-2">
-                        <span className={`w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
-                          isSolved 
-                            ? 'bg-emerald-200 text-emerald-800' 
+                        <span className={`w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 ${isSolved
+                            ? 'bg-emerald-200 text-emerald-800'
                             : 'bg-amber-200 text-amber-800'
-                        }`}>
+                          }`}>
                           {idx + 1}
                         </span>
                         <span className="text-xs font-semibold leading-relaxed">
@@ -882,11 +870,10 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                       <button
                         type="button"
                         onClick={() => toggleChecklistResolution(item.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 shrink-0 ${
-                          isSolved
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 shrink-0 ${isSolved
                             ? 'bg-emerald-600 text-white hover:bg-emerald-500'
                             : 'bg-amber-600 text-white hover:bg-amber-500'
-                        }`}
+                          }`}
                       >
                         {isSolved ? (
                           <>

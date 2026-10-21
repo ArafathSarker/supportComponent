@@ -418,30 +418,32 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
 
           {/* Right Header Controls: Tab Switcher (Client / Requester View vs Support Workspace) + Close */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <div className="inline-flex p-1 bg-slate-200/80 rounded-xl text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setActiveViewTab('requester')}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs transition-all ${
-                  activeViewTab === 'requester'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Client / Requester View
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveViewTab('workspace')}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs transition-all ${
-                  activeViewTab === 'workspace'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Support Workspace
-              </button>
-            </div>
+            {isSuperAdmin && (
+              <div className="inline-flex p-1 bg-slate-200/80 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setActiveViewTab('requester')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs transition-all ${
+                    activeViewTab === 'requester'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Client / Requester View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewTab('workspace')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs transition-all ${
+                    activeViewTab === 'workspace'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Support Workspace
+                </button>
+              </div>
+            )}
 
             <button 
               type="button" 
@@ -479,7 +481,7 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
             }`}
           >
             <Info size={14} />
-            <span>{activeViewTab === 'workspace' ? 'Workspace' : 'Details & Evidence'}</span>
+            <span>{isSuperAdmin && activeViewTab === 'workspace' ? 'Workspace' : 'Details & Evidence'}</span>
           </button>
         </div>
 
@@ -489,23 +491,8 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
           <div className={`md:col-span-5 bg-slate-50/70 border-r border-slate-200 p-4 sm:p-5 overflow-y-auto space-y-4 ${
             mobileDrawerTab === 'details' ? 'block' : 'hidden md:block'
           }`}>
-            {activeViewTab === 'workspace' ? (
+            {isSuperAdmin && activeViewTab === 'workspace' ? (
               <div className="space-y-4">
-                <div className="bg-white p-3.5 rounded-xl border border-blue-200 shadow-xs flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <Wrench size={14} className="text-blue-600" />
-                      <span>Support Workspace</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Internal triage, severity classification, and root cause diagnostic logs.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                    Staff Only
-                  </span>
-                </div>
-
                 {workspaceSuccessMsg && (
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-in fade-in">
                     <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />

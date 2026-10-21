@@ -1,1 +1,3 @@
-can you check the docker compose file why after running docker compose up the backend in port 8000 is not working bro
+Support Workspace
+Internal triage, severity classification, and root cause diagnostic logs.
+remove this part and the dual view support workspace will only appear in super-admin panel not in company owner when they open the ticket beacuse it is more valid r8

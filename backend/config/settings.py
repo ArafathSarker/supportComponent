@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'apps.tickets.apps.TicketsConfig',
     'apps.chat.apps.ChatConfig',
     'apps.visiting.apps.VisitingConfig',
+    'apps.support_management.apps.SupportManagementConfig',
     'apps.uploads.apps.UploadsConfig',
 ]
 

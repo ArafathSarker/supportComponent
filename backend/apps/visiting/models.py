@@ -24,9 +24,28 @@ class VisitingReport(models.Model):
     visiting_engineers = models.CharField(max_length=255)
     lead_engineer = models.CharField(max_length=150, default="", blank=True)
     lead_engineer_phone = models.CharField(max_length=50, default="", blank=True)
+    lead_employee = models.ForeignKey(
+        'support_management.SupportEmployee',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='lead_visits',
+    )
     visiting_team_names = models.TextField(blank=True, default="")
+    visiting_team_members = models.JSONField(default=list, blank=True)
     total_visitors = models.IntegerField(default=1)
+    # Checklist shown to the company owner and acknowledged by them.
     visit_checklist = models.JSONField(default=list, blank=True)
+    # Internal super-admin-only checklist built from dynamic dropdown options.
+    super_admin_checklist = models.JSONField(default=list, blank=True)
+    # Super admin toggle: reveal the total headcount to the company owner.
+    show_visitor_count = models.BooleanField(default=True)
+    # Company checklist audit flags (visible to super admins only).
+    is_flagged = models.BooleanField(default=False)
+    flag_reason = models.TextField(blank=True, default="")
+    flag_checklist_items = models.JSONField(default=list, blank=True)
+    flagged_at = models.DateTimeField(null=True, blank=True)
+    flagged_by = models.CharField(max_length=150, blank=True, default="")
     purpose = models.TextField()
     scheduled_date = models.CharField(max_length=100)
     estimated_duration = models.CharField(max_length=50, default="2 Hours", blank=True)

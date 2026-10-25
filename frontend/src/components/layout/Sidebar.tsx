@@ -3,14 +3,15 @@ import {
   Ticket, 
   FileCheck2, 
   Layers,
+  UserCog,
   X
 } from 'lucide-react';
-import type { UserRole } from '../support/types';
+import type { UserRole, SupportTab } from '../support/types';
 
 interface SidebarProps {
   role: UserRole;
-  activeTab: 'tickets' | 'visiting';
-  onTabChange: (tab: 'tickets' | 'visiting') => void;
+  activeTab: SupportTab;
+  onTabChange: (tab: SupportTab) => void;
   brandName?: string;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
@@ -96,6 +97,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="w-2 h-2 rounded-full bg-blue-600" />
           )}
         </div>
+
+        {/* 3. Support Ticket Management (Super Admin only) */}
+        {role === 'super_admin' && (
+          <div
+            onClick={() => {
+              onTabChange('management');
+              if (onCloseMobile) onCloseMobile();
+            }}
+            className={`flex items-center justify-between px-3.5 py-2.5 text-xs font-medium rounded-r-lg transition-all cursor-pointer ${
+              activeTab === 'management'
+                ? 'text-purple-700 bg-purple-50 font-semibold border-l-4 border-purple-600 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <UserCog size={16} className={activeTab === 'management' ? 'text-purple-600' : 'text-slate-400'} />
+              <span>Support Ticket Management</span>
+            </div>
+            {activeTab === 'management' && (
+              <span className="w-2 h-2 rounded-full bg-purple-600" />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sidebar Footer */}

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Shield, Wrench, Ticket, FileCheck2 } from 'lucide-react';
-import type { UserRole, CurrentUser, SupportTicketProps } from './types';
+import { Building2, Shield, Wrench, Ticket, FileCheck2, UserCog } from 'lucide-react';
+import type { UserRole, CurrentUser, SupportTicketProps, SupportTab } from './types';
 import { api } from './api';
 import { SupportTickets } from './SupportTickets';
 import { VisitingReports } from './VisitingReports';
+import { SupportManagement } from './SupportManagement';
 
 export const SupportTicketModule: React.FC<SupportTicketProps> = ({
   role: initialRole,
@@ -31,10 +32,10 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
     return initialRole || 'company_admin';
   });
 
-  const [internalTab, setInternalTab] = useState<'tickets' | 'visiting'>('tickets');
+  const [internalTab, setInternalTab] = useState<SupportTab>('tickets');
   const currentTab = controlledTab || internalTab;
 
-  const handleTabSwitch = (tab: 'tickets' | 'visiting') => {
+  const handleTabSwitch = (tab: SupportTab) => {
     setInternalTab(tab);
     if (onTabChange) {
       onTabChange(tab);
@@ -54,6 +55,9 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
   const handleToggleRole = (newRole: UserRole) => {
     setRole(newRole);
     localStorage.setItem('support_user_role', newRole);
+    if (newRole === 'company_admin' && currentTab === 'management') {
+      handleTabSwitch('tickets');
+    }
     if (onRoleChange) {
       onRoleChange(newRole);
     }
@@ -135,6 +139,21 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
           <FileCheck2 size={15} />
           <span>{role === 'company_admin' ? 'Visiting Report' : 'Visiting Log'}</span>
         </button>
+
+        {role === 'super_admin' && (
+          <button
+            type="button"
+            onClick={() => handleTabSwitch('management')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
+              currentTab === 'management'
+                ? 'text-purple-600 border-purple-600 bg-purple-50/70 rounded-t-lg'
+                : 'text-slate-500 border-transparent hover:text-slate-800 hover:bg-slate-100/60'
+            }`}
+          >
+            <UserCog size={15} />
+            <span>Support Ticket Management</span>
+          </button>
+        )}
       </div>
 
       {/* Active Tab View */}
@@ -147,6 +166,8 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
           onTicketUpdated={onTicketUpdated}
           onTicketClosed={onTicketClosed}
         />
+      ) : currentTab === 'management' ? (
+        <SupportManagement isSuperAdmin={role === 'super_admin'} />
       ) : (
         <VisitingReports currentUser={currentUser} />
       )}

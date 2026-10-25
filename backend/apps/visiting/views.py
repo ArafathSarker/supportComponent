@@ -8,7 +8,12 @@ from .serializers import (
     VisitingReportCreateSerializer,
     VisitingReportAcknowledgeSerializer,
     VisitingReportCompleteSerializer,
+    VisitingReportUpdateSerializer,
 )
+
+
+def _request_role(request, default='super_admin') -> str:
+    return request.headers.get('x-user-role') or request.query_params.get('role') or default
 
 
 class VisitingReportListCreateView(APIView):
@@ -25,14 +30,15 @@ class VisitingReportListCreateView(APIView):
             'search': request.query_params.get('search'),
         }
         queryset = VisitingReportService.list_reports(filters=filters)
-        serializer = VisitingReportSerializer(queryset, many=True)
+        role = _request_role(request)
+        serializer = VisitingReportSerializer(queryset, many=True, context={'role': role})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
         serializer = VisitingReportCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_role = request.headers.get('x-user-role') or request.query_params.get('role') or 'super_admin'
+        user_role = _request_role(request)
         user_name = request.headers.get('x-user-name') or request.query_params.get('user_name') or 'Lead Field Engineer'
 
         report = VisitingReportService.create_report(
@@ -40,7 +46,32 @@ class VisitingReportListCreateView(APIView):
             user_name=user_name,
             user_role=user_role
         )
-        return Response(VisitingReportSerializer(report).data, status=status.HTTP_201_CREATED)
+        return Response(
+            VisitingReportSerializer(report, context={'role': user_role}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+
+class VisitingReportDetailView(APIView):
+    """
+    PATCH /api/visiting/<visit_id>/
+    Super Admin updates headcount visibility and the internal checklist.
+    """
+    def patch(self, request, visit_id):
+        report = VisitingReportService.get_report(visit_id)
+        serializer = VisitingReportUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_role = _request_role(request)
+        updated_report = VisitingReportService.update_report(
+            report=report,
+            data=serializer.validated_data,
+            user_role=user_role
+        )
+        return Response(
+            VisitingReportSerializer(updated_report, context={'role': user_role}).data,
+            status=status.HTTP_200_OK
+        )
 
 
 class VisitingReportAcknowledgeView(APIView):
@@ -53,7 +84,7 @@ class VisitingReportAcknowledgeView(APIView):
         serializer = VisitingReportAcknowledgeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_role = request.headers.get('x-user-role') or request.query_params.get('role') or 'company_admin'
+        user_role = _request_role(request, default='company_admin')
         user_name = (
             request.headers.get('x-user-name') or
             serializer.validated_data.get('acknowledged_by') or
@@ -65,31 +96,44 @@ class VisitingReportAcknowledgeView(APIView):
             report=report,
             notes=notes,
             user_name=user_name,
-            user_role=user_role
+            user_role=user_role,
+            visit_checklist=serializer.validated_data.get('visit_checklist'),
         )
-        return Response(VisitingReportSerializer(updated_report).data, status=status.HTTP_200_OK)
+        return Response(
+            VisitingReportSerializer(updated_report, context={'role': user_role}).data,
+            status=status.HTTP_200_OK
+        )
 
 
 class VisitingReportCompleteView(APIView):
     """
     POST /api/visiting/<visit_id>/complete
-    Field Engineer (super_admin) marks report complete with summary.
+    Field Engineer (super_admin) marks report complete with summary, checklist
+    resolution and optional company-checklist audit flags.
     """
     def post(self, request, visit_id):
         report = VisitingReportService.get_report(visit_id)
         serializer = VisitingReportCompleteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_role = request.headers.get('x-user-role') or request.query_params.get('role') or 'super_admin'
+        user_role = _request_role(request)
         user_name = request.headers.get('x-user-name') or 'Field Engineer'
         summary = serializer.validated_data.get('service_summary', '')
         visit_checklist = serializer.validated_data.get('visit_checklist', None)
+        super_admin_checklist = serializer.validated_data.get('super_admin_checklist', None)
 
         completed_report = VisitingReportService.complete_report(
             report=report,
             service_summary=summary,
             user_name=user_name,
             user_role=user_role,
-            visit_checklist=visit_checklist
+            visit_checklist=visit_checklist,
+            super_admin_checklist=super_admin_checklist,
+            is_flagged=serializer.validated_data.get('is_flagged', False),
+            flag_reason=serializer.validated_data.get('flag_reason', ''),
+            flag_checklist_items=serializer.validated_data.get('flag_checklist_items', []),
         )
-        return Response(VisitingReportSerializer(completed_report).data, status=status.HTTP_200_OK)
+        return Response(
+            VisitingReportSerializer(completed_report, context={'role': user_role}).data,
+            status=status.HTTP_200_OK
+        )

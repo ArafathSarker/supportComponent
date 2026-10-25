@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Navbar } from './components/layout/Navbar';
 import { SupportTicketModule } from './components/support';
-import type { UserRole } from './components/support/types';
+import type { UserRole, SupportTab } from './components/support/types';
 
 export function App() {
   const [role, setRole] = useState<UserRole>(() => {
@@ -10,14 +10,23 @@ export function App() {
     return (saved === 'super_admin' || saved === 'company_admin') ? saved : 'company_admin';
   });
 
-  const [activeTab, setActiveTab] = useState<'tickets' | 'visiting'>('tickets');
+  const [activeTab, setActiveTab] = useState<SupportTab>('tickets');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleRoleToggle = () => {
     const newRole: UserRole = role === 'company_admin' ? 'super_admin' : 'company_admin';
     setRole(newRole);
     localStorage.setItem('support_user_role', newRole);
+    if (newRole === 'company_admin' && activeTab === 'management') {
+      setActiveTab('tickets');
+    }
   };
+
+  const tabLabel = activeTab === 'tickets'
+    ? 'Support Tickets'
+    : activeTab === 'management'
+      ? 'Support Ticket Management'
+      : (role === 'company_admin' ? 'Visiting Report' : 'Visiting Log');
 
   const userName = role === 'company_admin' ? 'Arafath' : 'Alex (Super Admin)';
   const companyName = 'CSI Smart Tech Ltd';
@@ -56,7 +65,7 @@ export function App() {
             </span>
             <span className="text-slate-400">/</span>
             <span className="text-slate-600 font-medium truncate">
-              {activeTab === 'tickets' ? 'Support Tickets' : (role === 'company_admin' ? 'Visiting Report' : 'Visiting Log')}
+              {tabLabel}
             </span>
           </div>
 

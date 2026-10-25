@@ -1,21 +1,37 @@
-import React, { useState } from 'react';
-import { 
-  X, 
-  Calendar, 
-  Loader2, 
-  AlertCircle, 
-  Wrench, 
-  Phone, 
-  User, 
-  Users, 
-  Plus, 
-  Trash2, 
+import React, { useEffect, useState } from 'react';
+import {
+  X,
+  Calendar,
+  Loader2,
+  AlertCircle,
+  Wrench,
+  Phone,
+  User,
+  Users,
+  Plus,
+  Trash2,
   CheckCircle2,
-  ListTodo
+  ListTodo,
+  ShieldAlert,
+  Eye,
+  EyeOff,
+  Lock,
+  UserCheck,
+  ChevronDown,
+  Ticket as TicketIcon,
+  ClipboardCheck
 } from 'lucide-react';
-import type { VisitingReport, CurrentUser, VisitChecklistItem } from './types';
+import type {
+  VisitingReport,
+  CurrentUser,
+  VisitChecklistItem,
+  SupportEmployee,
+  ChecklistOption,
+  Ticket
+} from './types';
 import { api } from './api';
 import { GARMENTS_FLOORS, GARMENTS_SYSTEMS } from './iotConfig';
+import { EmployeeSearchSelect, EmployeeMultiPicker } from './EmployeePicker';
 
 interface ScheduleVisitModalProps {
   isOpen: boolean;
@@ -36,11 +52,19 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
   const [floorLocation, setFloorLocation] = useState(GARMENTS_FLOORS[1]);
   const [lineNumber, setLineNumber] = useState('Sewing Line 04');
 
-  // Lead Engineer & Team
-  const [leadEngineer, setLeadEngineer] = useState('Engr. Rezaul Karim');
-  const [leadEngineerPhone, setLeadEngineerPhone] = useState('+880 1712-345678');
-  const [visitingTeamNames, setVisitingTeamNames] = useState('Engr. Shahin Alam (Hardware Specialist), Md. Kabir (Field Electrician)');
-  
+  // Managed employee directory
+  const [employees, setEmployees] = useState<SupportEmployee[]>([]);
+  const [checklistOptions, setChecklistOptions] = useState<ChecklistOption[]>([]);
+  const [directoryLoading, setDirectoryLoading] = useState(false);
+
+  // Optional related support ticket (its pre-visit checklist is audited on completion)
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [selectedTicketId, setSelectedTicketId] = useState('');
+
+  // Main / lead engineer selected from the directory
+  const [leadEmployeeId, setLeadEmployeeId] = useState('');
+  const [teamMembers, setTeamMembers] = useState<SupportEmployee[]>([]);
+
   // Date with calendar picker (default to tomorrow YYYY-MM-DD)
   const tomorrowStr = () => {
     const d = new Date();
@@ -49,7 +73,7 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
   };
   const [scheduledDate, setScheduledDate] = useState(tomorrowStr());
 
-  // Interactive Visit Checklist builder
+  // Company-owner-visible checklist builder
   const [checklist, setChecklist] = useState<VisitChecklistItem[]>([
     { id: 'chk-1', task: 'Inspect and align optical needle sensor on sewing line', status: 'pending' },
     { id: 'chk-2', task: 'Calibrate RS485 impedance and line termination resistors', status: 'pending' },
@@ -57,18 +81,80 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
   ]);
   const [newChecklistText, setNewChecklistText] = useState('');
 
+  // Super-admin-only internal checklist (dropdown options from management)
+  const [superChecklist, setSuperChecklist] = useState<VisitChecklistItem[]>([]);
+  const [selectedOptionId, setSelectedOptionId] = useState('');
+
+  // Headcount visibility toggle for the company owner
+  const [showVisitorCount, setShowVisitorCount] = useState(true);
+
   const [superAdminNotes, setSuperAdminNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+
+    const loadDirectory = async () => {
+      try {
+        setDirectoryLoading(true);
+        const [employeeList, optionList, ticketList] = await Promise.all([
+          api.getSupportEmployees({ activeOnly: true }),
+          api.getChecklistOptions({ activeOnly: true }),
+          api.getTickets({ role: 'super_admin' })
+        ]);
+        if (!cancelled) {
+          setEmployees(employeeList);
+          setChecklistOptions(optionList);
+          setTickets(ticketList.filter((ticket) => ticket.status !== 'Closed'));
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message || 'Failed to load the support employee directory.');
+        }
+      } finally {
+        if (!cancelled) setDirectoryLoading(false);
+      }
+    };
+
+    loadDirectory();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  // Changing the target factory invalidates a previously linked ticket.
+  useEffect(() => {
+    setSelectedTicketId('');
+  }, [companyName]);
+
   if (!isOpen) return null;
 
-  // Calculate total number of people: 1 (Lead Engineer) + other names parsed by comma/newline
-  const calculateTotalPersons = () => {
-    const trimmed = visitingTeamNames.trim();
-    if (!trimmed) return 1;
-    const count = trimmed.split(/[,;\n]+/).filter(Boolean).length;
-    return 1 + count;
+  const selectedLead = employees.find((employee) => employee.id === leadEmployeeId) || null;
+  const leadEngineer = selectedLead?.name || '';
+  const leadEngineerPhone = selectedLead?.phone || '';
+
+  // Prefer tickets raised by the target factory; fall back to every open ticket.
+  const factoryTickets = tickets.filter(
+    (ticket) =>
+      (ticket.company_name || '').trim().toLowerCase() === companyName.trim().toLowerCase()
+  );
+  const ticketChoices = factoryTickets.length > 0 ? factoryTickets : tickets;
+  const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) || null;
+  const selectedTicketPrechecklist = selectedTicket?.troubleshooting_checklist || [];
+
+  // Main engineer + accompanying employees
+  const totalVisitorsCount = 1 + teamMembers.length;
+
+  const handleAddTeamMember = (employee: SupportEmployee) => {
+    setTeamMembers((prev) =>
+      prev.some((member) => member.id === employee.id) ? prev : [...prev, employee]
+    );
+  };
+
+  const handleRemoveTeamMember = (employeeId: string) => {
+    setTeamMembers((prev) => prev.filter((member) => member.id !== employeeId));
   };
 
   const handleAddChecklistItem = (e?: React.FormEvent) => {
@@ -88,18 +174,37 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
     setChecklist((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const handleAddSuperChecklistItem = () => {
+    const option = checklistOptions.find((item) => item.id === selectedOptionId);
+    if (!option) return;
+    if (superChecklist.some((item) => item.option_id === option.id)) {
+      setSelectedOptionId('');
+      return;
+    }
+    setSuperChecklist((prev) => [
+      ...prev,
+      {
+        id: `sa-chk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        task: option.label,
+        option_id: option.id,
+        status: 'pending'
+      }
+    ]);
+    setSelectedOptionId('');
+  };
+
+  const handleRemoveSuperChecklistItem = (id: string) => {
+    setSuperChecklist((prev) => prev.filter((item) => item.id !== id));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim()) {
       setError('Target Factory / Client name is required.');
       return;
     }
-    if (!leadEngineer.trim()) {
-      setError('Lead Field Engineer name is required.');
-      return;
-    }
-    if (!leadEngineerPhone.trim()) {
-      setError('Lead Engineer phone number is required.');
+    if (!selectedLead) {
+      setError('Please search and select the main visiting engineer from the employee directory.');
       return;
     }
     if (!scheduledDate) {
@@ -107,7 +212,7 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
       return;
     }
     if (checklist.length === 0) {
-      setError('Please add at least one task or objective to the visit checklist.');
+      setError('Please add at least one task or objective to the company checklist.');
       return;
     }
 
@@ -115,26 +220,33 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
       setSubmitting(true);
       setError(null);
 
-      const totalPersons = calculateTotalPersons();
-      const allVisitingEngineers = visitingTeamNames.trim()
-        ? `${leadEngineer.trim()} (Lead), ${visitingTeamNames.trim()}`
-        : leadEngineer.trim();
-
       const created = await api.createVisitingReport({
         company_name: companyName.trim(),
         target_system: targetSystem,
         priority: priority,
         line_number: lineNumber,
         floor_location: floorLocation,
-        lead_engineer: leadEngineer.trim(),
-        lead_engineer_phone: leadEngineerPhone.trim(),
-        visiting_team_names: visitingTeamNames.trim(),
-        total_visitors: totalPersons,
-        visiting_engineers: allVisitingEngineers,
+        lead_engineer: leadEngineer,
+        lead_engineer_phone: leadEngineerPhone,
+        lead_employee_id: selectedLead.id,
+        visiting_team_members: teamMembers.map((member) => ({
+          employee_id: member.id,
+          name: member.name,
+          phone: member.phone,
+          designation: member.designation || ''
+        })),
+        visiting_team_names: teamMembers.map((member) => member.name).join(', '),
+        total_visitors: totalVisitorsCount,
+        visiting_engineers: [leadEngineer, ...teamMembers.map((member) => member.name)]
+          .filter(Boolean)
+          .join(', '),
         visit_checklist: checklist,
-        purpose: checklist.map(c => c.task).join('; '),
+        super_admin_checklist: superChecklist,
+        show_visitor_count: showVisitorCount,
+        purpose: checklist.map((c) => c.task).join('; '),
         scheduled_date: scheduledDate,
         super_admin_notes: superAdminNotes.trim(),
+        ticket_id: selectedTicketId || undefined,
         user_role: currentUser.role || 'super_admin',
         user_name: currentUser.name || leadEngineer
       });
@@ -148,11 +260,9 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
     }
   };
 
-  const totalVisitorsCount = calculateTotalPersons();
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-      <div 
+      <div
         className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -167,7 +277,7 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
                 Dispatch Factory On-Site Engineer Visit
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Assign lead engineer, team delegation, calendar date, and visit action checklist
+                Pick engineers from the directory, set headcount visibility, and build both checklists
               </p>
             </div>
           </div>
@@ -256,6 +366,55 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
           </div>
 
+          {/* Related Support Ticket */}
+          <div className="space-y-1.5 bg-amber-50/50 border border-amber-100 rounded-xl p-3.5">
+            <label className="text-xs font-semibold text-amber-950 flex items-center gap-1.5">
+              <TicketIcon size={14} className="text-amber-600" />
+              <span>Related Support Ticket</span>
+              <span className="text-[10px] text-slate-400 font-normal">Optional</span>
+            </label>
+            <select
+              value={selectedTicketId}
+              onChange={(e) => setSelectedTicketId(e.target.value)}
+              className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500 shadow-sm cursor-pointer"
+            >
+              <option value="">No linked ticket</option>
+              {ticketChoices.map((ticket) => (
+                <option key={ticket.id} value={ticket.id}>
+                  {ticket.ticket_code} — {ticket.title} ({ticket.company_name})
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-500">
+              Link this visit to a ticket so the company&apos;s pre-troubleshooting checklist can be
+              audited when the on-site team completes the visit.
+            </p>
+
+            {selectedTicket && (
+              <div className="bg-white border border-amber-200 rounded-lg p-2.5 space-y-1">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-amber-800 flex items-center gap-1">
+                  <ClipboardCheck size={11} />
+                  Company-claimed pre-visit checks ({selectedTicketPrechecklist.length})
+                </div>
+                {selectedTicketPrechecklist.length === 0 ? (
+                  <p className="text-[11px] text-slate-400">
+                    This ticket has no pre-troubleshooting checklist.
+                  </p>
+                ) : (
+                  selectedTicketPrechecklist.map((task, idx) => (
+                    <div key={idx} className="text-[11px] text-slate-700 flex items-start gap-1.5">
+                      <span className="text-amber-600 shrink-0">✓</span>
+                      <span>{task}</span>
+                    </div>
+                  ))
+                )}
+                <p className="text-[10px] text-slate-400 pt-0.5">
+                  Verify these on-site. Items found not done can be flagged during completion.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Calendar Date Picker */}
           <div className="space-y-1.5 bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5">
             <label className="text-xs font-semibold text-indigo-950 flex items-center gap-1.5">
@@ -277,7 +436,7 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
 
           {/* Lead Engineer & Team Delegation Box */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3.5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
                 <Users size={14} className="text-indigo-600" />
                 <span>Visiting Engineering Delegation</span>
@@ -287,20 +446,35 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               </span>
             </div>
 
-            {/* Lead Engineer Name and Phone */}
+            {directoryLoading ? (
+              <div className="flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg p-3">
+                <Loader2 size={14} className="animate-spin text-indigo-600" />
+                <span>Loading support employee directory...</span>
+              </div>
+            ) : employees.length === 0 ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-start gap-2">
+                <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  No support employees found. Add employees in <strong>Support Ticket Management</strong>{' '}
+                  to search and select visiting engineers.
+                </span>
+              </div>
+            ) : null}
+
+            {/* Main Engineer searchable picker */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                  <User size={12} className="text-slate-500" />
-                  <span>Lead Visiting Engineer (Team Leader)</span>
+                  <UserCheck size={12} className="text-slate-500" />
+                  <span>Main / Lead Visiting Engineer</span>
                   <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Engr. Rezaul Karim"
-                  value={leadEngineer}
-                  onChange={(e) => setLeadEngineer(e.target.value)}
-                  className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
+                <EmployeeSearchSelect
+                  employees={employees.filter((employee) => employee.is_lead_engineer !== false)}
+                  value={leadEmployeeId || null}
+                  onChange={(employeeId) => setLeadEmployeeId(employeeId)}
+                  placeholder="Search main engineer..."
+                  disabled={directoryLoading || employees.length === 0}
                   required
                 />
               </div>
@@ -308,45 +482,85 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
                   <Phone size={12} className="text-slate-500" />
-                  <span>Leader Mobile Phone Number</span>
-                  <span className="text-red-500">*</span>
+                  <span>Main Engineer Phone (auto-filled)</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. +880 1712-345678"
                   value={leadEngineerPhone}
-                  onChange={(e) => setLeadEngineerPhone(e.target.value)}
-                  className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
-                  required
+                  readOnly
+                  placeholder="Select the main engineer to auto-fill"
+                  className="w-full bg-slate-100 border border-slate-300 text-slate-700 rounded-lg px-3 py-2 text-xs cursor-not-allowed"
                 />
+                <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                  <Lock size={10} />
+                  This is the number shown to the company owner.
+                </p>
               </div>
             </div>
 
-            {/* Accompanying Visiting Team Members */}
-            <div className="space-y-1">
+            {/* Accompanying employees */}
+            <div className="space-y-1.5">
               <label className="text-[11px] font-semibold text-slate-700 flex items-center justify-between">
-                <span>Accompanying Team Members (Names of all other visiting persons)</span>
-                <span className="text-[10px] text-slate-400">Comma separated</span>
+                <span>Accompanying Visiting Employees</span>
+                <span className="text-[10px] text-slate-400">
+                  {teamMembers.length} selected • company sees names only
+                </span>
               </label>
-              <textarea
-                rows={2}
-                placeholder="Enter names of other engineers or technicians, e.g.: Engr. Shahin Alam, Md. Kabir (Electrician)..."
-                value={visitingTeamNames}
-                onChange={(e) => setVisitingTeamNames(e.target.value)}
-                className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
+              <EmployeeMultiPicker
+                employees={employees}
+                selected={teamMembers}
+                onAdd={handleAddTeamMember}
+                onRemove={handleRemoveTeamMember}
+                disabled={directoryLoading || employees.length === 0}
               />
               <p className="text-[11px] text-slate-500">
-                The company owner will see the Lead Engineer name, Phone Number, and the Total Number of People ({totalVisitorsCount}) on their acknowledgement screen.
+                Search and add every employee who will visit the factory. Only the main engineer's
+                phone number is displayed to the company owner.
               </p>
+            </div>
+
+            {/* Headcount visibility toggle */}
+            <div className="bg-white border border-slate-200 rounded-lg p-3 flex items-start justify-between gap-3 shadow-xs">
+              <div className="flex items-start gap-2">
+                <span className={`mt-0.5 ${showVisitorCount ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {showVisitorCount ? <Eye size={16} /> : <EyeOff size={16} />}
+                </span>
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-800">
+                    Show total headcount to company owner
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    {showVisitorCount
+                      ? `The company owner will see "Total: ${totalVisitorsCount} ${totalVisitorsCount === 1 ? 'Person' : 'Persons'}" on their acknowledgement screen.`
+                      : 'Hidden from the company owner. Only the main engineer name and phone are shown.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showVisitorCount}
+                onClick={() => setShowVisitorCount((prev) => !prev)}
+                title="Toggle total headcount visibility for the company owner"
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  showVisitorCount ? 'bg-emerald-600' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    showVisitorCount ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 
-          {/* Interactive Visit Action Checklist Builder */}
+          {/* Company Owner Visible Checklist Builder */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
                 <ListTodo size={15} className="text-indigo-600" />
-                <span>Visit Action Checklist (Tasks to accomplish on-site)</span>
+                <span>Company Owner Checklist (visible to client)</span>
                 <span className="text-red-500">*</span>
               </label>
               <span className="text-xs text-indigo-700 font-semibold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
@@ -355,10 +569,10 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
 
             <p className="text-[11px] text-slate-500">
-              Add specific objectives. The factory owner must acknowledge and approve this exact checklist prior to visit, and engineers will mark what was solved upon completion.
+              These tasks are shown to and acknowledged by the factory owner. The on-site team will
+              mark each one as solved or unsolved when completing the visit.
             </p>
 
-            {/* Input to add checklist items */}
             <div className="flex items-center gap-2">
               <input
                 type="text"
@@ -384,7 +598,6 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               </button>
             </div>
 
-            {/* Checklist Items List */}
             <div className="space-y-1.5 max-h-48 overflow-y-auto pt-1">
               {checklist.length === 0 ? (
                 <div className="p-3 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-300">
@@ -416,6 +629,86 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
           </div>
 
+          {/* Super Admin Internal Checklist (dropdown options) */}
+          <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <label className="text-xs font-bold text-purple-950 flex items-center gap-1.5 uppercase tracking-wide">
+                <ShieldAlert size={15} className="text-purple-600" />
+                <span>Super Admin Internal Checklist</span>
+              </label>
+              <span className="text-[10px] font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1">
+                <Lock size={10} />
+                Super Admin only
+              </span>
+            </div>
+
+            <p className="text-[11px] text-purple-800/80">
+              Internal on-site checks. Options come from Support Ticket Management and are never
+              shown to the company owner.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <select
+                  value={selectedOptionId}
+                  onChange={(e) => setSelectedOptionId(e.target.value)}
+                  className="w-full appearance-none bg-white border border-slate-300 text-slate-900 rounded-lg pl-3 pr-8 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm cursor-pointer"
+                >
+                  <option value="">
+                    {checklistOptions.length === 0
+                      ? 'No options yet — add them in Support Ticket Management'
+                      : 'Select an internal checklist option...'}
+                  </option>
+                  {checklistOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.category ? `[${option.category}] ` : ''}{option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddSuperChecklistItem}
+                disabled={!selectedOptionId}
+                className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1 shrink-0"
+              >
+                <Plus size={14} />
+                <span>Add</span>
+              </button>
+            </div>
+
+            <div className="space-y-1.5 max-h-44 overflow-y-auto">
+              {superChecklist.length === 0 ? (
+                <div className="p-3 text-center text-[11px] text-purple-700/60 bg-white rounded-lg border border-dashed border-purple-200">
+                  No internal checks added yet.
+                </div>
+              ) : (
+                superChecklist.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-2.5 bg-white border border-purple-200 rounded-lg text-xs text-slate-800 shadow-xs"
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 pr-2">
+                      <span className="w-5 h-5 rounded-full bg-purple-50 border border-purple-200 text-purple-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                        {index + 1}
+                      </span>
+                      <span className="font-medium">{item.task}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSuperChecklistItem(item.id)}
+                      className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Remove internal check"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           {/* Super Admin Internal Remarks */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700">Special Tools & Safety Notes</label>
@@ -430,30 +723,38 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
         </form>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 transition-colors shadow-sm"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="px-5 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {submitting ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                <span>Scheduling Dispatch...</span>
-              </>
-            ) : (
-              <span>Dispatch Visit ({totalVisitorsCount} Persons)</span>
-            )}
-          </button>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+          <span className="text-[11px] text-slate-500 hidden sm:flex items-center gap-1">
+            <Phone size={12} className="text-emerald-600" />
+            {selectedLead
+              ? `${leadEngineer} • ${leadEngineerPhone}`
+              : 'Select the main engineer'}
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 transition-colors shadow-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting || directoryLoading || !selectedLead}
+              className="px-5 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Scheduling Dispatch...</span>
+                </>
+              ) : (
+                <span>Dispatch Visit ({totalVisitorsCount} Persons)</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

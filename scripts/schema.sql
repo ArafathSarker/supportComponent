@@ -66,7 +66,31 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 4. Field Visiting Reports & Inspections Table
+-- 4. Support Employee Directory (Super Admin managed)
+CREATE TABLE IF NOT EXISTS support_employees (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    designation VARCHAR(100) NOT NULL DEFAULT '',
+    department VARCHAR(100) NOT NULL DEFAULT '',
+    is_lead_engineer BOOLEAN NOT NULL DEFAULT TRUE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 5. Dynamic Internal Checklist Dropdown Options (Super Admin managed)
+CREATE TABLE IF NOT EXISTS support_checklist_options (
+    id VARCHAR(36) PRIMARY KEY,
+    label VARCHAR(255) NOT NULL UNIQUE,
+    category VARCHAR(100) NOT NULL DEFAULT 'General',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 6. Field Visiting Reports & Inspections Table
 CREATE TABLE IF NOT EXISTS visiting_reports (
     id VARCHAR(36) PRIMARY KEY,
     visit_code VARCHAR(30) NOT NULL UNIQUE,
@@ -79,9 +103,18 @@ CREATE TABLE IF NOT EXISTS visiting_reports (
     visiting_engineers VARCHAR(255) NOT NULL,
     lead_engineer VARCHAR(150) NOT NULL DEFAULT '',
     lead_engineer_phone VARCHAR(50) NOT NULL DEFAULT '',
+    lead_employee_id VARCHAR(36) NULL REFERENCES support_employees(id) ON DELETE SET NULL,
     visiting_team_names TEXT NOT NULL DEFAULT '',
+    visiting_team_members JSONB NOT NULL DEFAULT '[]'::jsonb,
     total_visitors INTEGER NOT NULL DEFAULT 1,
     visit_checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
+    super_admin_checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
+    show_visitor_count BOOLEAN NOT NULL DEFAULT TRUE,
+    is_flagged BOOLEAN NOT NULL DEFAULT FALSE,
+    flag_reason TEXT NOT NULL DEFAULT '',
+    flag_checklist_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    flagged_at TIMESTAMPTZ NULL,
+    flagged_by VARCHAR(150) NOT NULL DEFAULT '',
     purpose TEXT NOT NULL DEFAULT '',
     scheduled_date VARCHAR(100) NOT NULL,
     estimated_duration VARCHAR(50) NOT NULL DEFAULT '2 Hours',
@@ -97,7 +130,7 @@ CREATE TABLE IF NOT EXISTS visiting_reports (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 5. Safe Column Compatibility Migrations (ensures no column missing errors)
+-- 7. Safe Column Compatibility Migrations (ensures no column missing errors)
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ticket_code VARCHAR(30);
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS title VARCHAR(255) NOT NULL DEFAULT '';
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS affected_system VARCHAR(100) NOT NULL DEFAULT 'General System';
@@ -154,9 +187,18 @@ ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS floor_location VARCHAR(100
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS visiting_engineers VARCHAR(255) NOT NULL DEFAULT '';
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS lead_engineer VARCHAR(150) NOT NULL DEFAULT '';
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS lead_engineer_phone VARCHAR(50) NOT NULL DEFAULT '';
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS lead_employee_id VARCHAR(36) NULL;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS visiting_team_names TEXT NOT NULL DEFAULT '';
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS visiting_team_members JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS total_visitors INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS visit_checklist JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS super_admin_checklist JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS show_visitor_count BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS is_flagged BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS flag_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS flag_checklist_items JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMPTZ NULL;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS flagged_by VARCHAR(150) NOT NULL DEFAULT '';
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS purpose TEXT NOT NULL DEFAULT '';
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS scheduled_date VARCHAR(100) NOT NULL DEFAULT '';
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS estimated_duration VARCHAR(50) NOT NULL DEFAULT '2 Hours';
@@ -171,7 +213,7 @@ ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS service_summary TEXT NULL;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
--- 6. Performance Indexes
+-- 8. Performance Indexes
 CREATE INDEX IF NOT EXISTS tickets_code_idx ON tickets(ticket_code);
 CREATE INDEX IF NOT EXISTS tickets_status_idx ON tickets(status);
 CREATE INDEX IF NOT EXISTS tickets_company_idx ON tickets(company_name);
@@ -179,3 +221,5 @@ CREATE INDEX IF NOT EXISTS ticket_attachments_ticket_idx ON ticket_attachments(t
 CREATE INDEX IF NOT EXISTS ticket_messages_ticket_idx ON ticket_messages(ticket_id);
 CREATE INDEX IF NOT EXISTS visiting_reports_code_idx ON visiting_reports(visit_code);
 CREATE INDEX IF NOT EXISTS visiting_reports_ticket_idx ON visiting_reports(ticket_id);
+CREATE INDEX IF NOT EXISTS support_employees_name_idx ON support_employees(name);
+CREATE INDEX IF NOT EXISTS support_checklist_options_active_idx ON support_checklist_options(is_active);

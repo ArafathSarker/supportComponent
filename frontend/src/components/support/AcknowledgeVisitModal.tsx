@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, 
   ShieldCheck, 
@@ -13,7 +13,7 @@ import {
   AlertTriangle,
   Building2
 } from 'lucide-react';
-import type { VisitingReport, CurrentUser } from './types';
+import type { VisitingReport, CurrentUser, VisitChecklistItem } from './types';
 import { api } from './api';
 
 interface AcknowledgeVisitModalProps {
@@ -35,13 +35,42 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
   const [notes, setNotes] = useState('Gate pass registered at Factory Main Gate. Factory floor escort arranged.');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmedChecklist, setConfirmedChecklist] = useState<VisitChecklistItem[]>([]);
+
+  // Reset the company's pre-visit confirmations whenever a different visit opens.
+  useEffect(() => {
+    if (!visit) {
+      setConfirmedChecklist([]);
+      return;
+    }
+    setConfirmedChecklist(
+      (visit.visit_checklist || []).map((item) => ({
+        ...item,
+        company_checked: Boolean(item.company_checked)
+      }))
+    );
+  }, [visit?.id, isOpen]);
 
   if (!isOpen || !visit) return null;
 
   const leadName = visit.lead_engineer || visit.visiting_engineers;
   const leadPhone = visit.lead_engineer_phone || '+880 1712-345678';
+  const showHeadcount =
+    visit.show_visitor_count !== false && typeof visit.total_visitors === 'number';
   const totalPersons = visit.total_visitors || 1;
-  const checklistItems = visit.visit_checklist || [];
+  const teamNames =
+    (visit.visiting_team_members || []).map((member) => member.name).filter(Boolean).join(', ') ||
+    visit.visiting_team_names;
+  const checklistItems = confirmedChecklist;
+  const confirmedCount = checklistItems.filter((item) => item.company_checked).length;
+
+  const toggleCompanyChecked = (id: string) => {
+    setConfirmedChecklist((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, company_checked: !item.company_checked } : item
+      )
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +78,13 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
       setSubmitting(true);
       setError(null);
 
-      const updated = await api.acknowledgeVisit(visit.id, acknowledgedBy, notes);
+      const updated = await api.acknowledgeVisit(
+        visit.id,
+        acknowledgedBy,
+        notes,
+        currentUser.role || 'company_admin',
+        checklistItems
+      );
       onVisitAcknowledged(updated);
       onClose();
     } catch (err: any) {
@@ -108,10 +143,17 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                   {visit.target_system}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-800 bg-indigo-100/80 px-2.5 py-1 rounded-full border border-indigo-200">
-                <Users size={13} />
-                <span>Total: {totalPersons} {totalPersons === 1 ? 'Person Visiting' : 'Persons Visiting'}</span>
-              </div>
+              {showHeadcount ? (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-800 bg-indigo-100/80 px-2.5 py-1 rounded-full border border-indigo-200">
+                  <Users size={13} />
+                  <span>Total: {totalPersons} {totalPersons === 1 ? 'Person Visiting' : 'Persons Visiting'}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-white/70 px-2.5 py-1 rounded-full border border-slate-200">
+                  <Users size={12} />
+                  <span>Headcount not shared</span>
+                </div>
+              )}
             </div>
 
             {/* Team Leader & Direct Phone Contact Card */}
@@ -143,9 +185,9 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
 
             {/* Accompanying Names & Calendar Scheduled Date */}
             <div className="text-xs text-slate-600 space-y-1.5 pt-1 border-t border-indigo-100/80">
-              {visit.visiting_team_names && (
+              {teamNames && (
                 <div>
-                  <strong className="text-slate-700">Team Members:</strong> {visit.visiting_team_names}
+                  <strong className="text-slate-700">Team Members:</strong> {teamNames}
                 </div>
               )}
               <div className="flex items-center gap-2 flex-wrap">
@@ -165,15 +207,19 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
                 <ListTodo size={15} className="text-indigo-600" />
-                <span>Visit Action Checklist (Tasks to be executed on-site)</span>
+                <span>Company Owner Checklist (Tasks to be executed on-site)</span>
               </label>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                {checklistItems.length > 0 ? `${checklistItems.length} Objectives` : 'Standard Inspection'}
+                {checklistItems.length > 0
+                  ? `${confirmedCount}/${checklistItems.length} Confirmed`
+                  : 'Standard Inspection'}
               </span>
             </div>
 
             <p className="text-[11px] text-slate-500">
-              The solution provider engineering team will be on-site specifically to resolve and fulfill the following checklist:
+              {checklistItems.length > 0
+                ? 'Tick every task your team has already handled before the engineers arrive. The on-site team audits these confirmations and flags anything claimed but not done.'
+                : 'The solution provider engineering team will be on-site specifically to resolve and fulfill the following checklist.'}
             </p>
 
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
@@ -184,15 +230,25 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                 </div>
               ) : (
                 checklistItems.map((item, idx) => (
-                  <div
+                  <label
                     key={item.id || idx}
-                    className="flex items-start gap-2.5 p-2 bg-white border border-slate-200/80 rounded-lg text-xs text-slate-800 shadow-xs"
+                    className={`flex items-start gap-2.5 p-2 border rounded-lg text-xs shadow-xs cursor-pointer transition-colors ${
+                      item.company_checked
+                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                        : 'bg-white border-slate-200/80 text-slate-800 hover:border-emerald-300'
+                    }`}
                   >
-                    <div className="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(item.company_checked)}
+                      onChange={() => toggleCompanyChecked(item.id)}
+                      className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="font-medium leading-relaxed flex-1">{item.task}</span>
+                    <span className="text-[10px] font-bold text-slate-400 shrink-0 mt-0.5">
                       {idx + 1}
-                    </div>
-                    <span className="font-medium leading-relaxed">{item.task}</span>
-                  </div>
+                    </span>
+                  </label>
                 ))
               )}
             </div>

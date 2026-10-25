@@ -1,13 +1,2 @@
-here look closely in the visiting log and report
-Action Checklist
-5 Tasks
-•
-Inspect and align optical needle sensor on sewing line
-•
-Calibrate RS485 impedance and line termination resistors
-•
-Test factory floor LoRaWAN edge gateway signal strength
-+2 more tasks...
-
-
-here +2 more I can't see them initially it is good do that way +2 but if any one click there they should see the others like it can be +2 , +3 , any thing ok
+all things are good but I said :
+in tshis part Company Owner Checklist (visible to client) this will be like super admin checklist it also have to be added form management system and this is not a checklist this is the reson why we are visiting the factory for maintanece or some other reson. and also the next to it not super admin checklist it will be also the reson why we are actually visiting the factory it is confidential for us and I said to track the checklist of the problem category under that problem category there have some checklist I said track that checklist are they checked or not because it have to be checked before creating or issueing a ticket if we visit the factory and find that a simple issue it can be solve if they flowed the precheklist then the people of superadmin part they should be acknowledge or flag it .

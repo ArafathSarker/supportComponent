@@ -17,9 +17,12 @@ Built with **React 19 / 18 + Tailwind CSS v3** on the frontend, backed by **Djan
 
 2. **Field Visiting Log & Visiting Report**:
    - **Schedule Visits**: Solution providers dispatch field engineers to client factories with scheduled dates, lead engineer contact, PPE requirements, and an **Action Checklist**.
+   - **Support Ticket Management (Super Admin)**: Maintain a searchable employee directory (name + phone + designation) and the dynamic dropdown options used by the internal checklist. Visit dispatch uses searchable employee pickers, so names and phone numbers are never typed manually.
+   - **Split Checklists**: A company-owner-visible checklist plus a dedicated Super Admin internal checklist built from dynamically managed dropdown options (never exposed to the client).
+   - **Headcount Visibility Toggle**: The Super Admin decides whether the company owner sees the total number of visiting people (`3 Persons`) or only the main engineer's name and phone.
    - **Client Acknowledgement**: Company owners review the delegation, assign an escort engineer, and generate gate passes.
    - **Interactive Action Checklist**: Concise 3-task view with clickable `+N more tasks...` to dynamically expand all tasks and `Show less` to collapse.
-   - **Resolution Logging**: Field engineers log completed visits and mark each checklist item as *Solved* or *Unsolved*.
+   - **Resolution Logging & Audit Flags**: Field engineers log completed visits and mark each checklist item as *Solved* or *Unsolved*. If the company claimed a pre-visit checklist item was handled but the on-site team found it was not, the Super Admin can **flag** that specific item with a reason. Flag data is visible to Super Admins only.
 
 ---
 
@@ -126,7 +129,7 @@ That's it! All ticket modals, chat drawers, visiting logs, pagination, search, a
 | `wsUrl` | `string` | Auto-detected | Base WebSocket URL (e.g. `ws://localhost:8000/ws` or `/ws`) |
 | `brandName` | `string` | `'CSI Smart Tech Ltd'` | Organization or tenant brand name |
 | `showRoleSwitcher`| `boolean` | `true` | Displays top banner to test between Client and Admin perspectives |
-| `activeTab` | `'tickets' \| 'visiting'` | `'tickets'` | Tab to display (`tickets` or `visiting`) |
+| `activeTab` | `'tickets' \| 'visiting' \| 'management'` | `'tickets'` | Tab to display (`tickets`, `visiting`, or super-admin `management`) |
 | `onTabChange` | `(tab) => void` | `undefined` | Callback fired when tab switches |
 | `categories` | `string[]` | 9 defaults | List of selectable issue categories in the Raise Ticket modal |
 | `systems` | `string[]` | 5 defaults | List of affected machine systems / assets |
@@ -209,7 +212,9 @@ If your existing project uses **Node.js (Express, Nest, Next.js API routes), Go,
 1. `support_tickets`: Stores ticket code (`TCK-YYYYMMDD-XXXX`), system, category, urgency, priority, status, diagnostics (occurrence, root cause, checklist, assigned engineer), and customer rating.
 2. `ticket_messages`: Real-time chat messages linked to a ticket (`sender_name`, `sender_role`, `message`, `attachment_url`).
 3. `ticket_attachments`: Files and evidence photos attached to tickets.
-4. `visiting_reports`: Scheduled field visits (`VIS-YYYYMMDD-XXXX`), delegation lead engineer, phone, date, purpose, `visit_checklist` (JSON), and acknowledgement state.
+4. `visiting_reports`: Scheduled field visits (`VIS-YYYYMMDD-XXXX`), delegation lead engineer, phone, date, `visit_checklist` (company-visible), `super_admin_checklist` (internal dropdown-based), `show_visitor_count` toggle, audit flags (`is_flagged`, `flag_reason`, `flag_checklist_items`), and acknowledgement state.
+5. `support_employees`: Super Admin managed employee directory (`name`, `phone`, `designation`, `department`, lead-engineer flag, active flag).
+6. `support_checklist_options`: Dynamic dropdown options for the Super Admin internal checklist (`label`, `category`, `sort_order`, active flag).
 
 ---
 
@@ -237,10 +242,23 @@ All endpoints accept standard JSON and return structured responses:
 ### 🚗 Visiting Reports API (`/api/visiting/`)
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/visiting/` | List visiting reports with role/company filtering |
-| `POST` | `/api/visiting/` | Schedule a new visit (delegation lead, date, checklist) |
+| `GET` | `/api/visiting/` | List visiting reports with role/company filtering (role-gated internal data) |
+| `POST` | `/api/visiting/` | Schedule a new visit (employee IDs, dual checklists, headcount toggle) |
+| `PATCH` | `/api/visiting/{id}/` | Toggle headcount visibility / update the internal checklist (Super Admin) |
 | `POST` | `/api/visiting/{id}/acknowledge/` | Acknowledge visit (gate pass info, escort engineer) |
-| `POST` | `/api/visiting/{id}/complete/` | Complete visit with itemized checklist resolution |
+| `POST` | `/api/visiting/{id}/complete/` | Complete visit with itemized resolution and optional audit flags |
+
+### ⚙️ Support Ticket Management API (`/api/support/`) — Super Admin only
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/support/employees/` | Search the employee directory (`?search=&active_only=1&lead_only=1`) |
+| `POST` | `/api/support/employees/` | Add a support employee (name + phone required) |
+| `PATCH` | `/api/support/employees/{id}/` | Update an employee |
+| `DELETE` | `/api/support/employees/{id}/` | Remove an employee |
+| `GET` | `/api/support/checklist-options/` | List internal checklist dropdown options |
+| `POST` | `/api/support/checklist-options/` | Add a dropdown option |
+| `PATCH` | `/api/support/checklist-options/{id}/` | Update / enable / disable an option |
+| `DELETE` | `/api/support/checklist-options/{id}/` | Remove an option |
 
 ### 📁 Uploads API (`/api/upload/`)
 | Method | Endpoint | Description |
@@ -266,6 +284,10 @@ All endpoints accept standard JSON and return structured responses:
 | Edit Open Ticket | ✅ Yes | ❌ No |
 | Live Chat Drawer | ✅ Yes | ✅ Yes |
 | Super Admin Workspace (Diagnostics) | ❌ Hidden | ✅ Yes (Lead engineer, root cause, triage) |
+| Support Ticket Management (employees + dropdown options) | ❌ Hidden | ✅ Yes |
+| See internal dropdown checklist | ❌ Never | ✅ Yes |
+| See total visitor headcount | ✅ Only when toggled on | ✅ Always |
+| Flag company pre-visit checklist items | ❌ Hidden | ✅ Yes |
 | Close Resolved Ticket | ✅ **Exclusive Authority** | ❌ Cannot close directly |
 | Schedule Visiting Engineer | ❌ No | ✅ Yes |
 | Acknowledge Visiting Delegation | ✅ Yes | ❌ No |

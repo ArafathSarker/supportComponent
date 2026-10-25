@@ -1,4 +1,4 @@
-import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport, TicketUrgency, TicketPriority, TicketWorkspacePayload } from './types';
+import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport, TicketUrgency, TicketPriority, TicketWorkspacePayload, SupportEmployee, ChecklistOption, VisitingTeamMember } from './types';
 
 const getDefaultApiBase = (): string => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
@@ -319,6 +319,131 @@ export class SupportApiClient {
     return res.json();
   }
 
+  // Support Ticket Management API methods (Super Admin only)
+  async getSupportEmployees(options?: {
+    search?: string;
+    activeOnly?: boolean;
+    leadOnly?: boolean;
+  }): Promise<SupportEmployee[]> {
+    const params = new URLSearchParams();
+    if (options?.search) params.append('search', options.search);
+    if (options?.activeOnly) params.append('active_only', '1');
+    if (options?.leadOnly) params.append('lead_only', '1');
+
+    const res = await fetch(`${this.apiBase}/support/employees/?${params.toString()}`, {
+      headers: { 'x-user-role': 'super_admin' },
+    });
+    if (!res.ok) throw new Error('Failed to load support employees');
+    return res.json();
+  }
+
+  async createSupportEmployee(payload: {
+    name: string;
+    phone: string;
+    designation?: string;
+    department?: string;
+    is_lead_engineer?: boolean;
+    is_active?: boolean;
+  }): Promise<SupportEmployee> {
+    const res = await fetch(`${this.apiBase}/support/employees/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-role': 'super_admin' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.phone?.[0] || err.name?.[0] || 'Failed to add support employee');
+    }
+    return res.json();
+  }
+
+  async updateSupportEmployee(
+    employeeId: string,
+    payload: Partial<SupportEmployee>
+  ): Promise<SupportEmployee> {
+    const res = await fetch(`${this.apiBase}/support/employees/${employeeId}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-role': 'super_admin' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.phone?.[0] || err.name?.[0] || 'Failed to update support employee');
+    }
+    return res.json();
+  }
+
+  async deleteSupportEmployee(employeeId: string): Promise<void> {
+    const res = await fetch(`${this.apiBase}/support/employees/${employeeId}/`, {
+      method: 'DELETE',
+      headers: { 'x-user-role': 'super_admin' },
+    });
+    if (!res.ok) throw new Error('Failed to remove support employee');
+  }
+
+  async getChecklistOptions(options?: {
+    search?: string;
+    activeOnly?: boolean;
+    category?: string;
+  }): Promise<ChecklistOption[]> {
+    const params = new URLSearchParams();
+    if (options?.search) params.append('search', options.search);
+    if (options?.activeOnly) params.append('active_only', '1');
+    if (options?.category) params.append('category', options.category);
+
+    const res = await fetch(`${this.apiBase}/support/checklist-options/?${params.toString()}`, {
+      headers: { 'x-user-role': 'super_admin' },
+    });
+    if (!res.ok) throw new Error('Failed to load checklist options');
+    return res.json();
+  }
+
+  async createChecklistOption(payload: {
+    label: string;
+    category?: string;
+    sort_order?: number;
+    is_active?: boolean;
+  }): Promise<ChecklistOption> {
+    const res = await fetch(`${this.apiBase}/support/checklist-options/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-role': 'super_admin' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        err.detail ||
+        err.label?.[0] ||
+        'Failed to add checklist option. The label may already exist.'
+      );
+    }
+    return res.json();
+  }
+
+  async updateChecklistOption(
+    optionId: string,
+    payload: Partial<ChecklistOption>
+  ): Promise<ChecklistOption> {
+    const res = await fetch(`${this.apiBase}/support/checklist-options/${optionId}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-role': 'super_admin' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.label?.[0] || 'Failed to update checklist option');
+    }
+    return res.json();
+  }
+
+  async deleteChecklistOption(optionId: string): Promise<void> {
+    const res = await fetch(`${this.apiBase}/support/checklist-options/${optionId}/`, {
+      method: 'DELETE',
+      headers: { 'x-user-role': 'super_admin' },
+    });
+    if (!res.ok) throw new Error('Failed to remove checklist option');
+  }
+
   // Visiting Reports API methods
   async getVisitingReports(options: {
     role?: UserRole;
@@ -350,9 +475,13 @@ export class SupportApiClient {
     visiting_engineers?: string;
     lead_engineer?: string;
     lead_engineer_phone?: string;
+    lead_employee_id?: string | null;
     visiting_team_names?: string;
+    visiting_team_members?: VisitingTeamMember[];
     total_visitors?: number;
     visit_checklist?: import('./types').VisitChecklistItem[];
+    super_admin_checklist?: import('./types').VisitChecklistItem[];
+    show_visitor_count?: boolean;
     purpose?: string;
     scheduled_date: string;
     estimated_duration?: string;
@@ -382,7 +511,8 @@ export class SupportApiClient {
     visitId: string,
     acknowledgedBy: string,
     notes?: string,
-    userRole: string = 'company_admin'
+    userRole: string = 'company_admin',
+    visitChecklist?: import('./types').VisitChecklistItem[]
   ): Promise<VisitingReport> {
     const res = await fetch(`${this.apiBase}/visiting/${visitId}/acknowledge/`, {
       method: 'POST',
@@ -394,6 +524,8 @@ export class SupportApiClient {
       body: JSON.stringify({
         acknowledged_by: acknowledgedBy,
         company_acknowledgement_notes: notes,
+        // Only the company_checked flags are honoured by the backend.
+        visit_checklist: visitChecklist,
       }),
     });
     if (!res.ok) {
@@ -408,7 +540,13 @@ export class SupportApiClient {
     serviceSummary: string = '',
     completedBy?: string,
     userRole: string = 'super_admin',
-    visitChecklist?: import('./types').VisitChecklistItem[]
+    visitChecklist?: import('./types').VisitChecklistItem[],
+    options?: {
+      super_admin_checklist?: import('./types').VisitChecklistItem[];
+      is_flagged?: boolean;
+      flag_reason?: string;
+      flag_checklist_items?: import('./types').VisitChecklistItem[];
+    }
   ): Promise<VisitingReport> {
     const res = await fetch(`${this.apiBase}/visiting/${visitId}/complete/`, {
       method: 'POST',
@@ -421,11 +559,41 @@ export class SupportApiClient {
         service_summary: serviceSummary,
         completed_by: completedBy,
         visit_checklist: visitChecklist,
+        super_admin_checklist: options?.super_admin_checklist,
+        is_flagged: options?.is_flagged || false,
+        flag_reason: options?.flag_reason || '',
+        flag_checklist_items: options?.flag_checklist_items || [],
       }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || err.error || 'Failed to complete visit');
+    }
+    return res.json();
+  }
+
+  async updateVisit(
+    visitId: string,
+    payload: {
+      show_visitor_count?: boolean;
+      super_admin_checklist?: import('./types').VisitChecklistItem[];
+      super_admin_notes?: string;
+    },
+    userRole: string = 'super_admin',
+    userName?: string
+  ): Promise<VisitingReport> {
+    const res = await fetch(`${this.apiBase}/visiting/${visitId}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': userRole,
+        'x-user-name': userName || 'Super Admin',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.error || 'Failed to update visiting report');
     }
     return res.json();
   }

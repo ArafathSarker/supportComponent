@@ -3,6 +3,8 @@ export * from './api';
 export * from './SupportTicketModule';
 export * from './SupportTickets';
 export * from './VisitingReports';
+export * from './SupportManagement';
+export * from './EmployeePicker';
 export * from './ScheduleVisitModal';
 export * from './AcknowledgeVisitModal';
 export * from './RaiseTicketModal';

@@ -31,6 +31,8 @@ urlpatterns = [
     path('api/tickets', include('apps.tickets.urls')),
     path('api/visiting/', include('apps.visiting.urls')),
     path('api/visiting', include('apps.visiting.urls')),
+    path('api/support/', include('apps.support_management.urls')),
+    path('api/support', include('apps.support_management.urls')),
     path('api/upload', include('apps.uploads.urls')),
     path('api/upload/', include('apps.uploads.urls')),
 

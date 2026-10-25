@@ -55,7 +55,7 @@ class VisitingReportListCreateView(APIView):
 class VisitingReportDetailView(APIView):
     """
     PATCH /api/visiting/<visit_id>/
-    Super Admin updates headcount visibility and the internal checklist.
+    Super Admin updates headcount visibility and the confidential visit reason.
     """
     def patch(self, request, visit_id):
         report = VisitingReportService.get_report(visit_id)
@@ -97,7 +97,6 @@ class VisitingReportAcknowledgeView(APIView):
             notes=notes,
             user_name=user_name,
             user_role=user_role,
-            visit_checklist=serializer.validated_data.get('visit_checklist'),
         )
         return Response(
             VisitingReportSerializer(updated_report, context={'role': user_role}).data,
@@ -108,8 +107,8 @@ class VisitingReportAcknowledgeView(APIView):
 class VisitingReportCompleteView(APIView):
     """
     POST /api/visiting/<visit_id>/complete
-    Field Engineer (super_admin) marks report complete with summary, checklist
-    resolution and optional company-checklist audit flags.
+    Field Engineer (super_admin) marks the report complete with a summary and the
+    audit of the company's pre-ticket checks (acknowledged or flagged).
     """
     def post(self, request, visit_id):
         report = VisitingReportService.get_report(visit_id)
@@ -119,19 +118,15 @@ class VisitingReportCompleteView(APIView):
         user_role = _request_role(request)
         user_name = request.headers.get('x-user-name') or 'Field Engineer'
         summary = serializer.validated_data.get('service_summary', '')
-        visit_checklist = serializer.validated_data.get('visit_checklist', None)
-        super_admin_checklist = serializer.validated_data.get('super_admin_checklist', None)
 
         completed_report = VisitingReportService.complete_report(
             report=report,
             service_summary=summary,
             user_name=user_name,
             user_role=user_role,
-            visit_checklist=visit_checklist,
-            super_admin_checklist=super_admin_checklist,
+            prechecklist_audit=serializer.validated_data.get('prechecklist_audit', []),
             is_flagged=serializer.validated_data.get('is_flagged', False),
             flag_reason=serializer.validated_data.get('flag_reason', ''),
-            flag_checklist_items=serializer.validated_data.get('flag_checklist_items', []),
         )
         return Response(
             VisitingReportSerializer(completed_report, context={'role': user_role}).data,

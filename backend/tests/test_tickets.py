@@ -1,6 +1,17 @@
 import pytest
 
 
+def _verified_prechecks(client, category="Hardware / Sensor / Device Problem"):
+    """Every managed pre-ticket check for a category, all verified."""
+    response = client.get(
+        "/api/support/checklist-options/",
+        data={"kind": "prechecklist", "category": category, "active_only": 1},
+        headers={"x-user-role": "company_admin"},
+    )
+    assert response.status_code == 200
+    return [{"label": item["label"], "checked": True} for item in response.json()]
+
+
 @pytest.mark.django_db
 def test_super_admin_cannot_create_ticket(client):
     """
@@ -40,7 +51,8 @@ def test_company_admin_ticket_lifecycle(client):
             "description": "Accelerometer telemetry shows 6.8 mm/s RMS vibration exceeding safe threshold.",
             "company_name": "CSI Smart Tech Ltd",
             "created_by_name": "Arafath",
-            "created_by_role": "company_admin"
+            "created_by_role": "company_admin",
+            "prechecklist": _verified_prechecks(client),
         },
         format="json"
     )

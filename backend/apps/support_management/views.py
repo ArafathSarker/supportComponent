@@ -92,12 +92,26 @@ class SupportEmployeeDetailView(APIView):
 
 class ChecklistOptionListCreateView(APIView):
     """
-    GET  /api/support/checklist-options/ - List dynamic dropdown options
+    GET  /api/support/checklist-options/ - List managed options
     POST /api/support/checklist-options/ - Add a new option (Super Admin only)
+
+    Visit reasons and confidential reasons are provider-only. Problem category
+    pre-ticket checks are readable by the company, because they must verify them
+    before raising a ticket.
     """
     def get(self, request):
-        _require_super_admin(request)
+        role = _resolve_role(request)
+        kind = (request.query_params.get('kind') or '').strip()
+
+        if role != 'super_admin' and kind != ChecklistOption.KIND_PRECHECKLIST:
+            raise PermissionDenied(
+                'Only Super Admin (Solution Provider) can view visit reasons.'
+            )
+
         queryset = ChecklistOption.objects.all()
+
+        if kind:
+            queryset = queryset.filter(kind=kind)
 
         search = (request.query_params.get('search') or '').strip()
         if search:

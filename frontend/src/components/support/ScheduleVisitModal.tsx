@@ -24,7 +24,7 @@ import {
 import type {
   VisitingReport,
   CurrentUser,
-  VisitChecklistItem,
+  VisitReason,
   SupportEmployee,
   ChecklistOption,
   Ticket
@@ -57,6 +57,9 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
   const [checklistOptions, setChecklistOptions] = useState<ChecklistOption[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(false);
 
+  const visitReasonOptions = checklistOptions.filter((option) => option.kind === 'visit_reason');
+  const internalReasonOptions = checklistOptions.filter((option) => option.kind === 'internal_reason');
+
   // Optional related support ticket (its pre-visit checklist is audited on completion)
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState('');
@@ -73,17 +76,13 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
   };
   const [scheduledDate, setScheduledDate] = useState(tomorrowStr());
 
-  // Company-owner-visible checklist builder
-  const [checklist, setChecklist] = useState<VisitChecklistItem[]>([
-    { id: 'chk-1', task: 'Inspect and align optical needle sensor on sewing line', status: 'pending' },
-    { id: 'chk-2', task: 'Calibrate RS485 impedance and line termination resistors', status: 'pending' },
-    { id: 'chk-3', task: 'Test factory floor LoRaWAN edge gateway signal strength', status: 'pending' }
-  ]);
-  const [newChecklistText, setNewChecklistText] = useState('');
+  // Reason for the visit shared with the company owner (managed options)
+  const [visitReasons, setVisitReasons] = useState<VisitReason[]>([]);
+  const [selectedReasonId, setSelectedReasonId] = useState('');
 
-  // Super-admin-only internal checklist (dropdown options from management)
-  const [superChecklist, setSuperChecklist] = useState<VisitChecklistItem[]>([]);
-  const [selectedOptionId, setSelectedOptionId] = useState('');
+  // The confidential, provider-only reason the visit is really made for
+  const [internalReasons, setInternalReasons] = useState<VisitReason[]>([]);
+  const [selectedInternalReasonId, setSelectedInternalReasonId] = useState('');
 
   // Headcount visibility toggle for the company owner
   const [showVisitorCount, setShowVisitorCount] = useState(true);
@@ -157,44 +156,45 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
     setTeamMembers((prev) => prev.filter((member) => member.id !== employeeId));
   };
 
-  const handleAddChecklistItem = (e?: React.FormEvent) => {
+  const handleAddReason = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const task = newChecklistText.trim();
-    if (!task) return;
-    const newItem: VisitChecklistItem = {
-      id: `chk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      task,
-      status: 'pending'
-    };
-    setChecklist((prev) => [...prev, newItem]);
-    setNewChecklistText('');
-  };
-
-  const handleRemoveChecklistItem = (id: string) => {
-    setChecklist((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const handleAddSuperChecklistItem = () => {
-    const option = checklistOptions.find((item) => item.id === selectedOptionId);
+    const option = visitReasonOptions.find((item) => item.id === selectedReasonId);
     if (!option) return;
-    if (superChecklist.some((item) => item.option_id === option.id)) {
-      setSelectedOptionId('');
-      return;
+    if (!visitReasons.some((reason) => reason.option_id === option.id)) {
+      setVisitReasons((prev) => [
+        ...prev,
+        {
+          id: `reason-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          label: option.label,
+          option_id: option.id
+        }
+      ]);
     }
-    setSuperChecklist((prev) => [
-      ...prev,
-      {
-        id: `sa-chk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        task: option.label,
-        option_id: option.id,
-        status: 'pending'
-      }
-    ]);
-    setSelectedOptionId('');
+    setSelectedReasonId('');
   };
 
-  const handleRemoveSuperChecklistItem = (id: string) => {
-    setSuperChecklist((prev) => prev.filter((item) => item.id !== id));
+  const handleRemoveReason = (id?: string) => {
+    setVisitReasons((prev) => prev.filter((reason) => reason.id !== id));
+  };
+
+  const handleAddInternalReason = () => {
+    const option = internalReasonOptions.find((item) => item.id === selectedInternalReasonId);
+    if (!option) return;
+    if (!internalReasons.some((reason) => reason.option_id === option.id)) {
+      setInternalReasons((prev) => [
+        ...prev,
+        {
+          id: `ireason-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          label: option.label,
+          option_id: option.id
+        }
+      ]);
+    }
+    setSelectedInternalReasonId('');
+  };
+
+  const handleRemoveInternalReason = (id?: string) => {
+    setInternalReasons((prev) => prev.filter((reason) => reason.id !== id));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -211,8 +211,8 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
       setError('Please select a scheduled visit date using the calendar.');
       return;
     }
-    if (checklist.length === 0) {
-      setError('Please add at least one task or objective to the company checklist.');
+    if (visitReasons.length === 0) {
+      setError('Select at least one reason for the factory visit.');
       return;
     }
 
@@ -240,10 +240,10 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
         visiting_engineers: [leadEngineer, ...teamMembers.map((member) => member.name)]
           .filter(Boolean)
           .join(', '),
-        visit_checklist: checklist,
-        super_admin_checklist: superChecklist,
+        visit_reasons: visitReasons,
+        internal_visit_reasons: internalReasons,
         show_visitor_count: showVisitorCount,
-        purpose: checklist.map((c) => c.task).join('; '),
+        purpose: visitReasons.map((reason) => reason.label).join('; '),
         scheduled_date: scheduledDate,
         super_admin_notes: superAdminNotes.trim(),
         ticket_id: selectedTicketId || undefined,
@@ -277,7 +277,7 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
                 Dispatch Factory On-Site Engineer Visit
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Pick engineers from the directory, set headcount visibility, and build both checklists
+                Pick engineers from the directory, set headcount visibility, and record why the visit is made
               </p>
             </div>
           </div>
@@ -555,111 +555,37 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
           </div>
 
-          {/* Company Owner Visible Checklist Builder */}
+          {/* Reason for Visit (visible to the company owner) */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
                 <ListTodo size={15} className="text-indigo-600" />
-                <span>Company Owner Checklist (visible to client)</span>
+                <span>Reason for Visit (visible to client)</span>
                 <span className="text-red-500">*</span>
               </label>
               <span className="text-xs text-indigo-700 font-semibold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                {checklist.length} Task{checklist.length !== 1 ? 's' : ''}
+                {visitReasons.length} Reason{visitReasons.length !== 1 ? 's' : ''}
               </span>
             </div>
 
             <p className="text-[11px] text-slate-500">
-              These tasks are shown to and acknowledged by the factory owner. The on-site team will
-              mark each one as solved or unsolved when completing the visit.
-            </p>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Type an objective (e.g. 'Calibrate needle counter', 'Replace power supply')..."
-                value={newChecklistText}
-                onChange={(e) => setNewChecklistText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddChecklistItem();
-                  }
-                }}
-                className="flex-1 bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
-              />
-              <button
-                type="button"
-                onClick={() => handleAddChecklistItem()}
-                disabled={!newChecklistText.trim()}
-                className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1 shrink-0"
-              >
-                <Plus size={14} />
-                <span>Add</span>
-              </button>
-            </div>
-
-            <div className="space-y-1.5 max-h-48 overflow-y-auto pt-1">
-              {checklist.length === 0 ? (
-                <div className="p-3 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-300">
-                  No tasks added yet. Type an objective above and click Add.
-                </div>
-              ) : (
-                checklist.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 shadow-xs group hover:border-indigo-300 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 flex-1 pr-2">
-                      <span className="w-5 h-5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0">
-                        {index + 1}
-                      </span>
-                      <span className="font-medium">{item.task}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveChecklistItem(item.id)}
-                      className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      title="Remove objective"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Super Admin Internal Checklist (dropdown options) */}
-          <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <label className="text-xs font-bold text-purple-950 flex items-center gap-1.5 uppercase tracking-wide">
-                <ShieldAlert size={15} className="text-purple-600" />
-                <span>Super Admin Internal Checklist</span>
-              </label>
-              <span className="text-[10px] font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1">
-                <Lock size={10} />
-                Super Admin only
-              </span>
-            </div>
-
-            <p className="text-[11px] text-purple-800/80">
-              Internal on-site checks. Options come from Support Ticket Management and are never
-              shown to the company owner.
+              Why the engineering team is visiting the factory. These reasons are shown to the
+              factory owner; the options are maintained in Support Ticket Management.
             </p>
 
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <select
-                  value={selectedOptionId}
-                  onChange={(e) => setSelectedOptionId(e.target.value)}
-                  className="w-full appearance-none bg-white border border-slate-300 text-slate-900 rounded-lg pl-3 pr-8 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm cursor-pointer"
+                  value={selectedReasonId}
+                  onChange={(e) => setSelectedReasonId(e.target.value)}
+                  className="w-full appearance-none bg-white border border-slate-300 text-slate-900 rounded-lg pl-3 pr-8 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
                 >
                   <option value="">
-                    {checklistOptions.length === 0
-                      ? 'No options yet — add them in Support Ticket Management'
-                      : 'Select an internal checklist option...'}
+                    {visitReasonOptions.length === 0
+                      ? 'No reasons yet — add them in Support Ticket Management'
+                      : 'Select a visit reason...'}
                   </option>
-                  {checklistOptions.map((option) => (
+                  {visitReasonOptions.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.category ? `[${option.category}] ` : ''}{option.label}
                     </option>
@@ -669,8 +595,88 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               </div>
               <button
                 type="button"
-                onClick={handleAddSuperChecklistItem}
-                disabled={!selectedOptionId}
+                onClick={() => handleAddReason()}
+                disabled={!selectedReasonId}
+                className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1 shrink-0"
+              >
+                <Plus size={14} />
+                <span>Add</span>
+              </button>
+            </div>
+
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pt-1">
+              {visitReasons.length === 0 ? (
+                <div className="p-3 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-300">
+                  No reason selected yet. Pick one above and click Add.
+                </div>
+              ) : (
+                visitReasons.map((reason, index) => (
+                  <div
+                    key={reason.id || index}
+                    className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 shadow-xs group hover:border-indigo-300 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 pr-2">
+                      <span className="w-5 h-5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                        {index + 1}
+                      </span>
+                      <span className="font-medium">{reason.label}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveReason(reason.id)}
+                      className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Remove reason"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Confidential Reason for Visit (provider only) */}
+          <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <label className="text-xs font-bold text-purple-950 flex items-center gap-1.5 uppercase tracking-wide">
+                <ShieldAlert size={15} className="text-purple-600" />
+                <span>Confidential Reason for Visit</span>
+              </label>
+              <span className="text-[10px] font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1">
+                <Lock size={10} />
+                Super Admin only
+              </span>
+            </div>
+
+            <p className="text-[11px] text-purple-800/80">
+              The real reason this visit is being made. Options come from Support Ticket Management
+              and are never shown to the company owner.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <select
+                  value={selectedInternalReasonId}
+                  onChange={(e) => setSelectedInternalReasonId(e.target.value)}
+                  className="w-full appearance-none bg-white border border-slate-300 text-slate-900 rounded-lg pl-3 pr-8 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm cursor-pointer"
+                >
+                  <option value="">
+                    {internalReasonOptions.length === 0
+                      ? 'No reasons yet — add them in Support Ticket Management'
+                      : 'Select a confidential reason...'}
+                  </option>
+                  {internalReasonOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.category ? `[${option.category}] ` : ''}{option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddInternalReason}
+                disabled={!selectedInternalReasonId}
                 className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1 shrink-0"
               >
                 <Plus size={14} />
@@ -679,27 +685,27 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
 
             <div className="space-y-1.5 max-h-44 overflow-y-auto">
-              {superChecklist.length === 0 ? (
+              {internalReasons.length === 0 ? (
                 <div className="p-3 text-center text-[11px] text-purple-700/60 bg-white rounded-lg border border-dashed border-purple-200">
-                  No internal checks added yet.
+                  No confidential reason added yet.
                 </div>
               ) : (
-                superChecklist.map((item, index) => (
+                internalReasons.map((reason, index) => (
                   <div
-                    key={item.id}
+                    key={reason.id || index}
                     className="flex items-center justify-between p-2.5 bg-white border border-purple-200 rounded-lg text-xs text-slate-800 shadow-xs"
                   >
                     <div className="flex items-center gap-2.5 flex-1 pr-2">
                       <span className="w-5 h-5 rounded-full bg-purple-50 border border-purple-200 text-purple-700 font-bold text-[10px] flex items-center justify-center shrink-0">
                         {index + 1}
                       </span>
-                      <span className="font-medium">{item.task}</span>
+                      <span className="font-medium">{reason.label}</span>
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleRemoveSuperChecklistItem(item.id)}
+                      onClick={() => handleRemoveInternalReason(reason.id)}
                       className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      title="Remove internal check"
+                      title="Remove confidential reason"
                     >
                       <Trash2 size={13} />
                     </button>

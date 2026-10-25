@@ -125,7 +125,21 @@ def test_visit_uses_employee_directory_and_hides_internal_data_from_company(clie
 
     option = client.post(
         "/api/support/checklist-options/",
-        data={"label": "Verify internal terminal torque", "category": "Electrical"},
+        data={
+            "label": "Verify internal terminal torque",
+            "category": "Electrical",
+            "kind": "internal_reason",
+        },
+        headers={"x-user-role": "super_admin"},
+        format="json",
+    ).json()
+    public_reason = client.post(
+        "/api/support/checklist-options/",
+        data={
+            "label": "Calibrate factory floor telemetry sensors",
+            "category": "Calibration",
+            "kind": "visit_reason",
+        },
         headers={"x-user-role": "super_admin"},
         format="json",
     ).json()
@@ -145,11 +159,11 @@ def test_visit_uses_employee_directory_and_hides_internal_data_from_company(clie
                     "designation": helper["designation"],
                 }
             ],
-            "visit_checklist": [
-                {"id": "chk-1", "task": "Inspect sensor alignment", "status": "pending"}
+            "visit_reasons": [
+                {"id": "r-1", "label": public_reason["label"], "option_id": public_reason["id"]}
             ],
-            "super_admin_checklist": [
-                {"id": "sa-1", "task": option["label"], "option_id": option["id"], "status": "pending"}
+            "internal_visit_reasons": [
+                {"id": "ir-1", "label": option["label"], "option_id": option["id"]}
             ],
             "show_visitor_count": False,
         },
@@ -165,7 +179,8 @@ def test_visit_uses_employee_directory_and_hides_internal_data_from_company(clie
     assert report["lead_engineer_phone"] == "+880 1711-111111"
     assert report["total_visitors"] == 2
     assert report["show_visitor_count"] is False
-    assert report["super_admin_checklist"][0]["task"] == option["label"]
+    assert report["visit_reasons"][0]["label"] == public_reason["label"]
+    assert report["internal_visit_reasons"][0]["label"] == option["label"]
 
     # Super admin sees the headcount even when it is hidden from the company
     super_list = client.get("/api/visiting/?role=super_admin")
@@ -179,10 +194,11 @@ def test_visit_uses_employee_directory_and_hides_internal_data_from_company(clie
     assert company_list.status_code == 200
     company_item = next(item for item in company_list.json() if item["id"] == visit_id)
     assert "total_visitors" not in company_item
-    assert "super_admin_checklist" not in company_item
+    assert "internal_visit_reasons" not in company_item
+    assert "prechecklist_audit" not in company_item
     assert "is_flagged" not in company_item
     assert "flag_reason" not in company_item
-    assert "flag_checklist_items" not in company_item
+    assert company_item["visit_reasons"][0]["label"] == public_reason["label"]
     assert all("phone" not in member for member in company_item["visiting_team_members"])
 
     # Only the super admin can flip headcount visibility back on
@@ -210,9 +226,91 @@ def test_visit_uses_employee_directory_and_hides_internal_data_from_company(clie
     assert company_after_item["total_visitors"] == 2
 
 
+PRECHECK_CATEGORY = "Hardware / Sensor / Device Problem"
+
+
+def _category_prechecks(client, category=PRECHECK_CATEGORY):
+    """Company-readable pre-ticket checks managed for a problem category."""
+    response = client.get(
+        "/api/support/checklist-options/",
+        data={"kind": "prechecklist", "category": category, "active_only": 1},
+        headers={"x-user-role": "company_admin"},
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
 @pytest.mark.django_db
-def test_audit_flags_are_super_admin_only(client):
+def test_prechecklist_must_be_verified_before_raising_a_ticket(client):
+    prechecks = _category_prechecks(client)
+    assert len(prechecks) > 0
+
+    base_payload = {
+        "title": "Needle sensor reads zero stitches",
+        "affected_system": "Sewing Floor IoT Network",
+        "category": PRECHECK_CATEGORY,
+        "description": "Telemetry flatlines while the machine runs.",
+        "company_name": "CSI Smart Tech Ltd",
+        "created_by_name": "Arafath",
+        "created_by_role": "company_admin",
+    }
+
+    # A partially verified pre-ticket checklist is rejected
+    incomplete = client.post(
+        "/api/tickets/",
+        data={
+            **base_payload,
+            "prechecklist": [
+                {"label": prechecks[0]["label"], "checked": True},
+                {"label": prechecks[1]["label"], "checked": False},
+            ],
+        },
+        headers={"x-user-role": "company_admin"},
+        format="json",
+    )
+    assert incomplete.status_code == 400
+    assert "prechecklist" in incomplete.json()
+
+    # Fully verified checklist is accepted and tracked on the ticket
+    complete = client.post(
+        "/api/tickets/",
+        data={
+            **base_payload,
+            "prechecklist": [
+                {"label": item["label"], "checked": True} for item in prechecks
+            ],
+        },
+        headers={"x-user-role": "company_admin"},
+        format="json",
+    )
+    assert complete.status_code == 201
+    ticket = complete.json()
+    assert len(ticket["prechecklist"]) == len(prechecks)
+    assert all(item["checked"] for item in ticket["prechecklist"])
+
+
+@pytest.mark.django_db
+def test_visit_prechecklist_audit_is_super_admin_only(client):
     lead = _create_employee(client, name='Engr. Flag Lead', phone='+880 1733-333333')
+
+    prechecks = _category_prechecks(client)
+    ticket = client.post(
+        "/api/tickets/",
+        data={
+            "title": "Needle sensor reads zero stitches",
+            "affected_system": "Sewing Floor IoT Network",
+            "category": PRECHECK_CATEGORY,
+            "description": "Telemetry flatlines while the machine runs.",
+            "company_name": "CSI Smart Tech Ltd",
+            "created_by_name": "Arafath",
+            "created_by_role": "company_admin",
+            "prechecklist": [
+                {"label": item["label"], "checked": True} for item in prechecks
+            ],
+        },
+        headers={"x-user-role": "company_admin"},
+        format="json",
+    ).json()
 
     visit = client.post(
         "/api/visiting/",
@@ -221,50 +319,43 @@ def test_audit_flags_are_super_admin_only(client):
             "target_system": "Chiller Telemetry",
             "scheduled_date": "2026-11-03",
             "lead_employee_id": lead["id"],
-            "visit_checklist": [
-                {"id": "chk-1", "task": "Inspect sensor alignment", "status": "pending"},
-                {"id": "chk-2", "task": "Calibrate telemetry", "status": "pending"},
+            "ticket_id": ticket["id"],
+            "visit_reasons": [
+                {"id": "r-1", "label": "Recurring telemetry / sensor fault investigation"}
+            ],
+            "internal_visit_reasons": [
+                {"id": "ir-1", "label": "Assess whether the reported fault was a simple user-side issue"}
             ],
         },
         headers={"x-user-role": "super_admin"},
         format="json",
     ).json()
     visit_id = visit["id"]
+    assert len(visit["ticket_prechecklist"]) == len(prechecks)
 
     ack = client.post(
         f"/api/visiting/{visit_id}/acknowledge/",
-        data={
-            "acknowledged_by": "Arafath",
-            "visit_checklist": [
-                {"id": "chk-1", "task": "HACKED TEXT", "company_checked": True},
-                {"id": "chk-2", "task": "Calibrate telemetry", "company_checked": False},
-            ],
-        },
+        data={"acknowledged_by": "Arafath", "company_acknowledgement_notes": "Gate pass ready."},
         headers={"x-user-role": "company_admin"},
         format="json",
     )
     assert ack.status_code == 200
-    acked_checklist = ack.json()["visit_checklist"]
-    assert acked_checklist[0]["company_checked"] is True
-    # Company confirmation cannot rewrite the provider-owned task text
-    assert acked_checklist[0]["task"] == "Inspect sensor alignment"
-    assert acked_checklist[1]["company_checked"] is False
+    assert ack.json()["status"] == "Acknowledged"
 
-    flagged_item = {
-        "id": "chk-1",
-        "task": "Inspect sensor alignment",
-        "status": "unsolved",
-        "flagged": True,
-        "flag_note": "Not actually inspected",
-    }
+    audit = [
+        {
+            "id": f"pre-{index}",
+            "task": item["label"],
+            "status": "flagged" if index == 0 else "acknowledged",
+        }
+        for index, item in enumerate(prechecks)
+    ]
     complete = client.post(
         f"/api/visiting/{visit_id}/complete/",
         data={
-            "service_summary": "One objective required follow-up.",
-            "visit_checklist": [flagged_item, {"id": "chk-2", "task": "Calibrate telemetry", "status": "solved"}],
-            "is_flagged": True,
-            "flag_reason": "Company claimed the alignment was checked but the team found it untouched.",
-            "flag_checklist_items": [flagged_item],
+            "service_summary": "Sensor was never cleaned; lint blockage found on-site.",
+            "prechecklist_audit": audit,
+            "flag_reason": "Company marked the lint cleaning as done but the sensor was fouled.",
         },
         headers={"x-user-role": "super_admin"},
         format="json",
@@ -272,8 +363,9 @@ def test_audit_flags_are_super_admin_only(client):
     assert complete.status_code == 200
     completed = complete.json()
     assert completed["is_flagged"] is True
-    assert "untouched" in completed["flag_reason"]
-    assert completed["flag_checklist_items"][0]["task"] == "Inspect sensor alignment"
+    assert "fouled" in completed["flag_reason"]
+    assert completed["prechecklist_audit"][0]["status"] == "flagged"
+    assert completed["prechecklist_audit"][1]["status"] == "acknowledged"
     assert completed["flagged_by"] == "Field Engineer"
 
     # Super admin sees the audit trail
@@ -283,7 +375,7 @@ def test_audit_flags_are_super_admin_only(client):
     )
     assert super_item["is_flagged"] is True
 
-    # Company admin never receives flag data or per-item flag markers
+    # Company admin never receives the confidential reason or the audit
     company_item = next(
         item for item in client.get(
             "/api/visiting/?role=company_admin&company_name=CSI Smart Tech Ltd"
@@ -292,5 +384,6 @@ def test_audit_flags_are_super_admin_only(client):
     )
     assert "is_flagged" not in company_item
     assert "flag_reason" not in company_item
-    assert "flag_checklist_items" not in company_item
-    assert all("flagged" not in item and "flag_note" not in item for item in company_item["visit_checklist"])
+    assert "prechecklist_audit" not in company_item
+    assert "internal_visit_reasons" not in company_item
+    assert company_item["visit_reasons"][0]["label"] == "Recurring telemetry / sensor fault investigation"

@@ -27,6 +27,10 @@ class Ticket(models.Model):
     created_by_role = models.CharField(max_length=50, default="company_admin")
     iot_details = models.JSONField(default=dict, blank=True)
     troubleshooting_checklist = models.JSONField(default=list, blank=True)
+    # Problem-category pre-ticket checks verified before the ticket was raised:
+    # [{'label': ..., 'checked': True}]. Tracked so an on-site visit can audit
+    # whether the company really performed them.
+    prechecklist = models.JSONField(default=list, blank=True)
     # Support Engineer Workspace fields
     support_severity = models.CharField(max_length=50, blank=True, default="")
     assigned_engineer = models.CharField(max_length=150, blank=True, default="")

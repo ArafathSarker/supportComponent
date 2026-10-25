@@ -1,6 +1,6 @@
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.exceptions import PermissionDenied, NotFound, ValidationError
 
 from apps.core.utils import generate_ticket_code
 from apps.core.events import broadcast_global_event, broadcast_ticket_event
@@ -78,6 +78,68 @@ class TicketService:
         return queryset
 
     @staticmethod
+    def resolve_prechecklist(category: str, raw_prechecklist, checked_labels) -> list:
+        """
+        Build the problem-category pre-ticket checklist for a ticket.
+
+        Items are managed per problem category in Support Ticket Management and
+        must all be verified before a ticket can be issued.
+        """
+        from apps.support_management.models import ChecklistOption
+
+        managed = list(
+            ChecklistOption.objects.filter(
+                kind=ChecklistOption.KIND_PRECHECKLIST,
+                category=category,
+                is_active=True,
+            ).order_by('sort_order', 'label')
+        )
+
+        checked = set()
+        checked_order = []
+
+        def mark_checked(label):
+            if label and label not in checked:
+                checked.add(label)
+                checked_order.append(label)
+
+        for label in checked_labels or []:
+            if isinstance(label, str):
+                mark_checked(label)
+
+        supplied = []
+        for item in raw_prechecklist or []:
+            if not isinstance(item, dict):
+                continue
+            label = (item.get('label') or item.get('task') or '').strip()
+            if not label:
+                continue
+            is_checked = bool(item.get('checked'))
+            supplied.append({'label': label, 'checked': is_checked})
+            if is_checked:
+                mark_checked(label)
+
+        if managed:
+            entries = [
+                {'label': option.label, 'checked': option.label in checked}
+                for option in managed
+            ]
+            missing = [entry['label'] for entry in entries if not entry['checked']]
+            if missing:
+                raise ValidationError({
+                    'prechecklist': (
+                        'Verify every pre-ticket check for this problem category before '
+                        f'raising the ticket. Missing: {"; ".join(missing)}'
+                    )
+                })
+            return entries
+
+        if supplied:
+            return supplied
+
+        return [{'label': label, 'checked': True} for label in checked_order]
+
+    @staticmethod
     def create_ticket(data: dict, user_name: str, user_role: str, user_company: str) -> Ticket:
         # Business rule: Solution provider (super_admin) cannot raise support tickets
         if user_role == 'super_admin':
@@ -87,6 +149,13 @@ class TicketService:
         author_name = user_name or data.get('created_by_name', 'Arafath')
         author_role = user_role or data.get('created_by_role', 'company_admin')
         code = generate_ticket_code(Ticket)
+
+        prechecklist = TicketService.resolve_prechecklist(
+            data['category'],
+            data.get('prechecklist'),
+            data.get('troubleshooting_checklist'),
+        )
+        verified_labels = [item['label'] for item in prechecklist if item['checked']]
 
         ticket = Ticket.objects.create(
             ticket_code=code,
@@ -100,7 +169,8 @@ class TicketService:
             floor_location=data.get('floor_location', ''),
             machine_id=data.get('machine_id', ''),
             iot_details=data.get('iot_details', {}),
-            troubleshooting_checklist=data.get('troubleshooting_checklist', []),
+            troubleshooting_checklist=verified_labels or data.get('troubleshooting_checklist', []),
+            prechecklist=prechecklist,
             description=data['description'],
             status='Open',
             company_name=effective_company,

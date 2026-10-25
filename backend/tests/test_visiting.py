@@ -29,6 +29,12 @@ def test_visiting_report_workflow(client):
             "floor_location": "Basement - Boiler & Utility Plant",
             "visiting_engineers": "Engr. Rezaul Karim, Engr. Shahin",
             "purpose": "Sensor probe calibration and thermal imaging audit",
+            "visit_reasons": [
+                {"id": "r-1", "label": "Recurring telemetry / sensor fault investigation", "option_id": "opt-1"}
+            ],
+            "internal_visit_reasons": [
+                {"id": "ir-1", "label": "Assess whether the reported fault was actually a simple user-side issue"}
+            ],
             "scheduled_date": "2026-10-26 11:00 AM",
             "estimated_duration": "4 Hours",
             "entry_requirements": "Boiler room safety pass",
@@ -44,6 +50,8 @@ def test_visiting_report_workflow(client):
     assert report["priority"] == "Urgent"
     assert report["line_number"] == "Boiler Line 01"
     assert report["floor_location"] == "Basement - Boiler & Utility Plant"
+    assert report["visit_reasons"][0]["label"] == "Recurring telemetry / sensor fault investigation"
+    assert report["internal_visit_reasons"][0]["option_id"] == ""
 
     # 3. Company Admin acknowledges the visit
     ack_res = client.post(
@@ -62,7 +70,10 @@ def test_visiting_report_workflow(client):
     comp_res = client.post(
         f"/api/visiting/{visit_id}/complete/",
         data={
-            "service_summary": "Thermal imaging audit finished without anomalies. Probes calibrated."
+            "service_summary": "Thermal imaging audit finished without anomalies. Probes calibrated.",
+            "prechecklist_audit": [
+                {"id": "pre-1", "task": "Cleaned optical sensor lens", "status": "acknowledged"}
+            ]
         },
         headers={"x-user-role": "super_admin"},
         format="json"

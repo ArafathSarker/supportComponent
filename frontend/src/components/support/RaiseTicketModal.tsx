@@ -58,19 +58,42 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
   const selectedCategoryConfig = GARMENTS_IOT_CATEGORIES.find(
     (c) => c.category.toLowerCase() === selectedCategoryName.toLowerCase()
   );
-  const preChecklist = selectedCategoryConfig?.troubleshootingChecklist || [
+  const configPreChecklist = selectedCategoryConfig?.troubleshootingChecklist || [
     'Cleaned and inspected physical sensor/equipment',
     'Checked auxiliary power adapter and LED indicator',
     'Verified harness connections are secure',
     'Performed a 30-second restart/power-cycle'
   ];
 
+  // Pre-ticket checks are managed per problem category in Support Ticket Management.
+  const [managedPreChecklist, setManagedPreChecklist] = useState<string[]>([]);
+  const preChecklist = managedPreChecklist.length > 0 ? managedPreChecklist : configPreChecklist;
+
   const [checkedItems, setCheckedItems] = useState<string[]>([]);
 
-  // When problem category changes, reset checked items
+  // When problem category changes, load its managed checks and reset verified items
   useEffect(() => {
     setCheckedItems([]);
-  }, [selectedCategoryName]);
+    let cancelled = false;
+
+    api
+      .getChecklistOptions({
+        kind: 'prechecklist',
+        category: selectedCategoryName,
+        activeOnly: true,
+        role: currentUser.role,
+      })
+      .then((options) => {
+        if (!cancelled) setManagedPreChecklist(options.map((option) => option.label));
+      })
+      .catch(() => {
+        if (!cancelled) setManagedPreChecklist([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategoryName, currentUser.role]);
 
   const toggleChecklistItem = (item: string) => {
     setCheckedItems((prev) =>
@@ -94,6 +117,10 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
       setError('Please provide detailed problem description.');
       return;
     }
+    if (checkedItems.length < preChecklist.length) {
+      setError('Verify every pre-ticket check before raising this ticket.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -111,6 +138,10 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
         floor_location: floorLocation,
         machine_id: '',
         troubleshooting_checklist: checkedItems,
+        prechecklist: preChecklist.map((label) => ({
+          label,
+          checked: checkedItems.includes(label),
+        })),
         description: description.trim(),
         company_name: currentUser.company_name || 'CSI Smart Tech Ltd',
         created_by_name: currentUser.name || 'Arafath',
@@ -240,15 +271,20 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
                 <ListChecks size={15} className="text-blue-600" />
-                <span>Pre-Troubleshooting Checklist</span>
+                <span>Pre-Ticket Checklist</span>
               </label>
-              <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                {checkedItems.length} of {preChecklist.length} Attempted
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
+                checkedItems.length === preChecklist.length
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  : 'text-blue-700 bg-blue-50 border-blue-200'
+              }`}>
+                {checkedItems.length} of {preChecklist.length} Verified
               </span>
             </div>
 
             <p className="text-[11px] text-slate-500">
-              Check all steps verified on the factory floor prior to raising this ticket:
+              Every step below must be verified on the factory floor before this ticket can be raised.
+              Our engineers audit these claims during an on-site visit and flag any that were not done.
             </p>
 
             <div className="space-y-1.5 pt-1">
@@ -396,7 +432,12 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || checkedItems.length < preChecklist.length}
+            title={
+              checkedItems.length < preChecklist.length
+                ? 'Verify every pre-ticket check before raising this ticket'
+                : undefined
+            }
             className="px-5 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
           >
             {submitting ? (

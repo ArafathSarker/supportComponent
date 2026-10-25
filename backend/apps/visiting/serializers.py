@@ -4,30 +4,13 @@ from .models import VisitingReport
 
 # Fields that must never leak to the company owner / client side.
 SUPER_ADMIN_ONLY_FIELDS = (
-    'super_admin_checklist',
+    'internal_visit_reasons',
+    'prechecklist_audit',
     'is_flagged',
     'flag_reason',
-    'flag_checklist_items',
     'flagged_at',
     'flagged_by',
 )
-
-
-def _clean_visit_checklist(items, is_super_admin: bool):
-    """Strip internal audit markers from company-visible checklist items."""
-    if is_super_admin or not isinstance(items, list):
-        return items
-    cleaned = []
-    for item in items:
-        if isinstance(item, dict):
-            cleaned.append({
-                key: value
-                for key, value in item.items()
-                if key not in ('flagged', 'flag_note')
-            })
-        else:
-            cleaned.append(item)
-    return cleaned
 
 
 def _clean_team_members(members, is_super_admin: bool):
@@ -52,9 +35,10 @@ class VisitingReportSerializer(serializers.ModelSerializer):
     Full serializer for field visiting inspection reports.
 
     Role-aware output:
-      * Super Admin receives internal checklists, audit flags and live headcount.
-      * Company Admin receives only the company checklist and the headcount when
-        the super admin has enabled the visibility toggle.
+      * Super Admin receives the confidential visit reason, the prechecklist
+        audit and live headcount.
+      * Company Admin receives only the visit reason shared with them and the
+        headcount when the super admin has enabled the visibility toggle.
     """
     ticket_id = serializers.CharField(source='ticket.id', read_only=True, allow_null=True)
     ticket_code = serializers.SerializerMethodField()
@@ -69,11 +53,17 @@ class VisitingReportSerializer(serializers.ModelSerializer):
         return obj.ticket.title if obj.ticket else None
 
     def get_ticket_prechecklist(self, obj):
-        """The company's claimed pre-troubleshooting checks from ticket creation."""
+        """The problem-category checks recorded on the linked ticket."""
         if not obj.ticket:
             return []
+        items = obj.ticket.prechecklist
+        if isinstance(items, list) and items:
+            return items
+        # Legacy tickets only stored the verified labels.
         checklist = obj.ticket.troubleshooting_checklist
-        return checklist if isinstance(checklist, list) else []
+        if isinstance(checklist, list):
+            return [{'label': label, 'checked': True} for label in checklist]
+        return []
 
     def get_lead_employee_id(self, obj):
         return obj.lead_employee_id
@@ -99,12 +89,12 @@ class VisitingReportSerializer(serializers.ModelSerializer):
             'visiting_team_names',
             'visiting_team_members',
             'total_visitors',
-            'visit_checklist',
-            'super_admin_checklist',
+            'visit_reasons',
+            'internal_visit_reasons',
             'show_visitor_count',
+            'prechecklist_audit',
             'is_flagged',
             'flag_reason',
-            'flag_checklist_items',
             'flagged_at',
             'flagged_by',
             'purpose',
@@ -136,9 +126,6 @@ class VisitingReportSerializer(serializers.ModelSerializer):
             if not instance.show_visitor_count:
                 data.pop('total_visitors', None)
 
-            data['visit_checklist'] = _clean_visit_checklist(
-                data.get('visit_checklist'), is_super_admin=False
-            )
             data['visiting_team_members'] = _clean_team_members(
                 data.get('visiting_team_members'), is_super_admin=False
             )
@@ -166,8 +153,8 @@ class VisitingReportCreateSerializer(serializers.Serializer):
         child=serializers.DictField(), required=False, default=list
     )
     total_visitors = serializers.IntegerField(required=False, default=1)
-    visit_checklist = serializers.ListField(child=serializers.DictField(), required=False, default=list)
-    super_admin_checklist = serializers.ListField(
+    visit_reasons = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+    internal_visit_reasons = serializers.ListField(
         child=serializers.DictField(), required=False, default=list
     )
     show_visitor_count = serializers.BooleanField(required=False, default=True)
@@ -190,35 +177,29 @@ class VisitingReportAcknowledgeSerializer(serializers.Serializer):
     """
     company_acknowledgement_notes = serializers.CharField(required=False, allow_blank=True, default="")
     acknowledged_by = serializers.CharField(max_length=100, default="Arafath", required=False)
-    # Company-side confirmation of the pre-visit checklist items. Only the
-    # `company_checked` flag is honoured; task text stays provider-owned.
-    visit_checklist = serializers.ListField(
-        child=serializers.DictField(), required=False
-    )
 
 
 class VisitingReportCompleteSerializer(serializers.Serializer):
     """
     Validation schema for completing a field visit report (Solution Provider).
+
+    The audit records, per pre-ticket check claimed by the company, whether the
+    on-site team could acknowledge it or had to flag it.
     """
     service_summary = serializers.CharField(required=False, allow_blank=True, default="")
-    visit_checklist = serializers.ListField(child=serializers.DictField(), required=False, default=list)
-    super_admin_checklist = serializers.ListField(
+    prechecklist_audit = serializers.ListField(
         child=serializers.DictField(), required=False, default=list
     )
     is_flagged = serializers.BooleanField(required=False, default=False)
     flag_reason = serializers.CharField(required=False, allow_blank=True, default="")
-    flag_checklist_items = serializers.ListField(
-        child=serializers.DictField(), required=False, default=list
-    )
 
 
 class VisitingReportUpdateSerializer(serializers.Serializer):
     """
-    Super Admin maintenance of a scheduled visit (visibility + internal checklist).
+    Super Admin maintenance of a scheduled visit (visibility + confidential reason).
     """
     show_visitor_count = serializers.BooleanField(required=False)
-    super_admin_checklist = serializers.ListField(
+    internal_visit_reasons = serializers.ListField(
         child=serializers.DictField(), required=False
     )
     super_admin_notes = serializers.CharField(required=False, allow_blank=True)

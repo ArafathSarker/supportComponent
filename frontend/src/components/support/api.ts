@@ -108,6 +108,7 @@ export class SupportApiClient {
     machine_id?: string;
     iot_details?: Record<string, any>;
     troubleshooting_checklist?: string[];
+    prechecklist?: import('./types').PrechecklistItem[];
     description: string;
     company_name: string;
     created_by_name: string;
@@ -385,20 +386,24 @@ export class SupportApiClient {
     search?: string;
     activeOnly?: boolean;
     category?: string;
+    kind?: import('./types').ChecklistOptionKind;
+    role?: UserRole;
   }): Promise<ChecklistOption[]> {
     const params = new URLSearchParams();
     if (options?.search) params.append('search', options.search);
     if (options?.activeOnly) params.append('active_only', '1');
     if (options?.category) params.append('category', options.category);
+    if (options?.kind) params.append('kind', options.kind);
 
     const res = await fetch(`${this.apiBase}/support/checklist-options/?${params.toString()}`, {
-      headers: { 'x-user-role': 'super_admin' },
+      headers: { 'x-user-role': options?.role || 'super_admin' },
     });
     if (!res.ok) throw new Error('Failed to load checklist options');
     return res.json();
   }
 
   async createChecklistOption(payload: {
+    kind: import('./types').ChecklistOptionKind;
     label: string;
     category?: string;
     sort_order?: number;
@@ -479,8 +484,8 @@ export class SupportApiClient {
     visiting_team_names?: string;
     visiting_team_members?: VisitingTeamMember[];
     total_visitors?: number;
-    visit_checklist?: import('./types').VisitChecklistItem[];
-    super_admin_checklist?: import('./types').VisitChecklistItem[];
+    visit_reasons?: import('./types').VisitReason[];
+    internal_visit_reasons?: import('./types').VisitReason[];
     show_visitor_count?: boolean;
     purpose?: string;
     scheduled_date: string;
@@ -511,8 +516,7 @@ export class SupportApiClient {
     visitId: string,
     acknowledgedBy: string,
     notes?: string,
-    userRole: string = 'company_admin',
-    visitChecklist?: import('./types').VisitChecklistItem[]
+    userRole: string = 'company_admin'
   ): Promise<VisitingReport> {
     const res = await fetch(`${this.apiBase}/visiting/${visitId}/acknowledge/`, {
       method: 'POST',
@@ -524,8 +528,6 @@ export class SupportApiClient {
       body: JSON.stringify({
         acknowledged_by: acknowledgedBy,
         company_acknowledgement_notes: notes,
-        // Only the company_checked flags are honoured by the backend.
-        visit_checklist: visitChecklist,
       }),
     });
     if (!res.ok) {
@@ -540,12 +542,10 @@ export class SupportApiClient {
     serviceSummary: string = '',
     completedBy?: string,
     userRole: string = 'super_admin',
-    visitChecklist?: import('./types').VisitChecklistItem[],
     options?: {
-      super_admin_checklist?: import('./types').VisitChecklistItem[];
+      prechecklist_audit?: import('./types').PrechecklistAuditItem[];
       is_flagged?: boolean;
       flag_reason?: string;
-      flag_checklist_items?: import('./types').VisitChecklistItem[];
     }
   ): Promise<VisitingReport> {
     const res = await fetch(`${this.apiBase}/visiting/${visitId}/complete/`, {
@@ -558,11 +558,9 @@ export class SupportApiClient {
       body: JSON.stringify({
         service_summary: serviceSummary,
         completed_by: completedBy,
-        visit_checklist: visitChecklist,
-        super_admin_checklist: options?.super_admin_checklist,
+        prechecklist_audit: options?.prechecklist_audit || [],
         is_flagged: options?.is_flagged || false,
         flag_reason: options?.flag_reason || '',
-        flag_checklist_items: options?.flag_checklist_items || [],
       }),
     });
     if (!res.ok) {
@@ -576,7 +574,7 @@ export class SupportApiClient {
     visitId: string,
     payload: {
       show_visitor_count?: boolean;
-      super_admin_checklist?: import('./types').VisitChecklistItem[];
+      internal_visit_reasons?: import('./types').VisitReason[];
       super_admin_notes?: string;
     },
     userRole: string = 'super_admin',

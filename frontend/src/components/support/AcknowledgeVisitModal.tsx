@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   ShieldCheck, 
@@ -13,7 +13,7 @@ import {
   AlertTriangle,
   Building2
 } from 'lucide-react';
-import type { VisitingReport, CurrentUser, VisitChecklistItem } from './types';
+import type { VisitingReport, CurrentUser } from './types';
 import { api } from './api';
 
 interface AcknowledgeVisitModalProps {
@@ -35,21 +35,6 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
   const [notes, setNotes] = useState('Gate pass registered at Factory Main Gate. Factory floor escort arranged.');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmedChecklist, setConfirmedChecklist] = useState<VisitChecklistItem[]>([]);
-
-  // Reset the company's pre-visit confirmations whenever a different visit opens.
-  useEffect(() => {
-    if (!visit) {
-      setConfirmedChecklist([]);
-      return;
-    }
-    setConfirmedChecklist(
-      (visit.visit_checklist || []).map((item) => ({
-        ...item,
-        company_checked: Boolean(item.company_checked)
-      }))
-    );
-  }, [visit?.id, isOpen]);
 
   if (!isOpen || !visit) return null;
 
@@ -61,16 +46,7 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
   const teamNames =
     (visit.visiting_team_members || []).map((member) => member.name).filter(Boolean).join(', ') ||
     visit.visiting_team_names;
-  const checklistItems = confirmedChecklist;
-  const confirmedCount = checklistItems.filter((item) => item.company_checked).length;
-
-  const toggleCompanyChecked = (id: string) => {
-    setConfirmedChecklist((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, company_checked: !item.company_checked } : item
-      )
-    );
-  };
+  const visitReasons = visit.visit_reasons || [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,8 +58,7 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
         visit.id,
         acknowledgedBy,
         notes,
-        currentUser.role || 'company_admin',
-        checklistItems
+        currentUser.role || 'company_admin'
       );
       onVisitAcknowledged(updated);
       onClose();
@@ -111,7 +86,7 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                 Review & Acknowledge Factory Visit
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Verify engineering delegation, direct contact, and visit action checklist
+                Verify the delegation, direct contact, and the reason for the visit
               </p>
             </div>
           </div>
@@ -202,53 +177,41 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
             </div>
           </div>
 
-          {/* Action Checklist To Meet On-Site */}
+          {/* Reason the engineers are visiting the factory */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
                 <ListTodo size={15} className="text-indigo-600" />
-                <span>Company Owner Checklist (Tasks to be executed on-site)</span>
+                <span>Reason for this Visit</span>
               </label>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                {checklistItems.length > 0
-                  ? `${confirmedCount}/${checklistItems.length} Confirmed`
-                  : 'Standard Inspection'}
+                {visitReasons.length > 0 ? `${visitReasons.length} Reason${visitReasons.length !== 1 ? 's' : ''}` : 'Standard Inspection'}
               </span>
             </div>
 
             <p className="text-[11px] text-slate-500">
-              {checklistItems.length > 0
-                ? 'Tick every task your team has already handled before the engineers arrive. The on-site team audits these confirmations and flags anything claimed but not done.'
-                : 'The solution provider engineering team will be on-site specifically to resolve and fulfill the following checklist.'}
+              The engineering team is coming on-site for the reasons below. All pre-ticket checks
+              must be verified by your team before raising the related support ticket.
             </p>
 
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-              {checklistItems.length === 0 ? (
+              {visitReasons.length === 0 ? (
                 <div className="text-xs text-slate-600 flex items-center gap-2">
                   <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
                   <span>{visit.purpose || 'Comprehensive on-site IoT hardware inspection and calibration'}</span>
                 </div>
               ) : (
-                checklistItems.map((item, idx) => (
-                  <label
-                    key={item.id || idx}
-                    className={`flex items-start gap-2.5 p-2 border rounded-lg text-xs shadow-xs cursor-pointer transition-colors ${
-                      item.company_checked
-                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
-                        : 'bg-white border-slate-200/80 text-slate-800 hover:border-emerald-300'
-                    }`}
+                visitReasons.map((reason, idx) => (
+                  <div
+                    key={reason.id || idx}
+                    className="flex items-start gap-2.5 p-2 border border-slate-200/80 rounded-lg text-xs bg-white text-slate-800 shadow-xs"
                   >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.company_checked)}
-                      onChange={() => toggleCompanyChecked(item.id)}
-                      className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span className="font-medium leading-relaxed flex-1">{item.task}</span>
+                    <CheckCircle2 size={14} className="text-indigo-600 shrink-0 mt-0.5" />
+                    <span className="font-medium leading-relaxed flex-1">{reason.label}</span>
                     <span className="text-[10px] font-bold text-slate-400 shrink-0 mt-0.5">
                       {idx + 1}
                     </span>
-                  </label>
+                  </div>
                 ))
               )}
             </div>

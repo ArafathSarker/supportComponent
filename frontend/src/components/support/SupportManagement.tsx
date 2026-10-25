@@ -15,7 +15,7 @@ import {
   X,
   Lock
 } from 'lucide-react';
-import type { SupportEmployee, ChecklistOption } from './types';
+import type { SupportEmployee, ChecklistOption, ChecklistOptionKind } from './types';
 import { api } from './api';
 
 interface SupportManagementProps {
@@ -32,10 +32,23 @@ const emptyEmployeeForm = {
 };
 
 const emptyOptionForm = {
+  kind: 'visit_reason' as ChecklistOptionKind,
   label: '',
   category: 'General',
   sort_order: 0,
   is_active: true,
+};
+
+const OPTION_KIND_LABELS: Record<ChecklistOptionKind, string> = {
+  visit_reason: 'Reason for visit (client visible)',
+  internal_reason: 'Confidential reason',
+  prechecklist: 'Problem category pre-check',
+};
+
+const OPTION_KIND_STYLES: Record<ChecklistOptionKind, string> = {
+  visit_reason: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  internal_reason: 'bg-purple-50 text-purple-700 border-purple-200',
+  prechecklist: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
 export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdmin = true }) => {
@@ -44,6 +57,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
   const [loading, setLoading] = useState(true);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [optionSearch, setOptionSearch] = useState('');
+  const [optionKindFilter, setOptionKindFilter] = useState<'all' | ChecklistOptionKind>('all');
 
   const [employeeForm, setEmployeeForm] = useState({ ...emptyEmployeeForm });
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
@@ -99,6 +113,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
   });
 
   const filteredOptions = options.filter((option) => {
+    if (optionKindFilter !== 'all' && option.kind !== optionKindFilter) return false;
     const q = optionSearch.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -106,6 +121,11 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
       (option.category || '').toLowerCase().includes(q)
     );
   });
+
+  const optionCounts = options.reduce<Record<string, number>>((acc, option) => {
+    acc[option.kind] = (acc[option.kind] || 0) + 1;
+    return acc;
+  }, {});
 
   const leadEmployeeCount = employees.filter((employee) => employee.is_lead_engineer).length;
 
@@ -230,6 +250,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
     setEditingOptionId(option.id);
     setOptionError(null);
     setOptionForm({
+      kind: option.kind || 'visit_reason',
       label: option.label,
       category: option.category || 'General',
       sort_order: option.sort_order || 0,
@@ -276,8 +297,8 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
               Support Ticket Management
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
-              Maintain the support employee directory used by visit dispatch, and manage the dynamic
-              dropdown options for the Super Admin internal checklist.
+              Maintain the support employee directory, the visit reasons shared with clients, the
+              confidential reasons for a visit, and the pre-ticket checks for each problem category.
             </p>
           </div>
         </div>
@@ -523,21 +544,21 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
             <div className="p-4 border-b border-slate-200 bg-purple-50/50 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <ListChecks size={16} className="text-purple-600" />
-                <h3 className="text-sm font-bold text-slate-900">Internal Checklist Options</h3>
+                <h3 className="text-sm font-bold text-slate-900">Visit Reasons & Pre-Checks</h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
                   {options.length}
                 </span>
               </div>
               <span className="text-[11px] text-purple-700 flex items-center gap-1">
                 <Lock size={10} />
-                Not visible to client
+                Visit reasons are provider-only
               </span>
             </div>
 
             <form onSubmit={handleOptionSubmit} className="p-4 space-y-3 border-b border-slate-100 bg-slate-50/30">
               <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
                 <ListChecks size={13} className="text-purple-600" />
-                {editingOptionId ? 'Edit dropdown option' : 'Add dropdown option'}
+                {editingOptionId ? 'Edit option' : 'Add option'}
               </div>
 
               {optionError && (
@@ -548,14 +569,39 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
               )}
 
               <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-slate-700">Option Type</label>
+                <select
+                  value={optionForm.kind}
+                  onChange={(e) =>
+                    setOptionForm((prev) => ({
+                      ...prev,
+                      kind: e.target.value as ChecklistOptionKind,
+                    }))
+                  }
+                  className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm cursor-pointer"
+                >
+                  {(Object.keys(OPTION_KIND_LABELS) as ChecklistOptionKind[]).map((kind) => (
+                    <option key={kind} value={kind}>
+                      {OPTION_KIND_LABELS[kind]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-700">
-                  Option Label <span className="text-red-500">*</span>
+                  {optionForm.kind === 'prechecklist' ? 'Pre-Check Item' : 'Reason'}{' '}
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={optionForm.label}
                   onChange={(e) => setOptionForm((prev) => ({ ...prev, label: e.target.value }))}
-                  placeholder="e.g. Verify control panel wiring and terminal tightness"
+                  placeholder={
+                    optionForm.kind === 'prechecklist'
+                      ? 'e.g. Cleaned the sensor lens before raising the ticket'
+                      : 'e.g. Scheduled preventive maintenance of IoT hardware'
+                  }
                   className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm"
                   required
                 />
@@ -563,12 +609,18 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-slate-700">Category</label>
+                  <label className="text-[11px] font-semibold text-slate-700">
+                    {optionForm.kind === 'prechecklist' ? 'Problem Category' : 'Category'}
+                  </label>
                   <input
                     type="text"
                     value={optionForm.category}
                     onChange={(e) => setOptionForm((prev) => ({ ...prev, category: e.target.value }))}
-                    placeholder="e.g. Electrical"
+                    placeholder={
+                      optionForm.kind === 'prechecklist'
+                        ? 'e.g. Hardware / Sensor / Device Problem'
+                        : 'e.g. Maintenance'
+                    }
                     className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm"
                   />
                 </div>
@@ -592,7 +644,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                   onChange={(e) => setOptionForm((prev) => ({ ...prev, is_active: e.target.checked }))}
                   className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                 />
-                Available in the Super Admin checklist dropdown
+                Available in the managed option lists
               </label>
 
               <div className="flex items-center gap-2">
@@ -621,13 +673,30 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
             </form>
 
             <div className="p-4 space-y-2.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(['all', 'visit_reason', 'internal_reason', 'prechecklist'] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => setOptionKindFilter(kind)}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                      optionKindFilter === kind
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {kind === 'all' ? `All (${options.length})` : `${OPTION_KIND_LABELS[kind]} (${optionCounts[kind] || 0})`}
+                  </button>
+                ))}
+              </div>
+
               <div className="relative flex items-center">
                 <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
                 <input
                   type="text"
                   value={optionSearch}
                   onChange={(e) => setOptionSearch(e.target.value)}
-                  placeholder="Search checklist options..."
+                  placeholder="Search options..."
                   className="w-full bg-slate-50 border border-slate-300 text-slate-800 pl-8 pr-3 py-2 rounded-lg text-xs focus:bg-white focus:outline-none focus:border-purple-500 shadow-sm"
                 />
                 {optionSearch && (
@@ -645,7 +714,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
               <div className="max-h-[26rem] overflow-y-auto space-y-1.5 pr-1">
                 {filteredOptions.length === 0 ? (
                   <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl">
-                    No checklist options found. Add the first option above to populate the dropdown.
+                    No options found for this filter. Add one above to populate the lists.
                   </div>
                 ) : (
                   filteredOptions.map((option) => (
@@ -663,8 +732,11 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                             {option.label}
                           </div>
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border ${OPTION_KIND_STYLES[option.kind] || OPTION_KIND_STYLES.visit_reason}`}>
+                              {OPTION_KIND_LABELS[option.kind] || option.kind}
+                            </span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                              {option.category || 'General'}
+                              {option.kind === 'prechecklist' ? 'Category: ' : ''}{option.category || 'General'}
                             </span>
                             <span className="text-[10px] text-slate-400">
                               Sort #{option.sort_order || 0}

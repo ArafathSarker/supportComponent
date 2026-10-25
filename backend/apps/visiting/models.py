@@ -34,16 +34,18 @@ class VisitingReport(models.Model):
     visiting_team_names = models.TextField(blank=True, default="")
     visiting_team_members = models.JSONField(default=list, blank=True)
     total_visitors = models.IntegerField(default=1)
-    # Checklist shown to the company owner and acknowledged by them.
-    visit_checklist = models.JSONField(default=list, blank=True)
-    # Internal super-admin-only checklist built from dynamic dropdown options.
-    super_admin_checklist = models.JSONField(default=list, blank=True)
+    # Reason for the visit shared with the company owner (managed options).
+    visit_reasons = models.JSONField(default=list, blank=True)
+    # The real, confidential reason for the visit (provider staff only).
+    internal_visit_reasons = models.JSONField(default=list, blank=True)
     # Super admin toggle: reveal the total headcount to the company owner.
     show_visitor_count = models.BooleanField(default=True)
-    # Company checklist audit flags (visible to super admins only).
+    # Audit of the problem-category pre-ticket checks the company claimed to have
+    # done before raising the linked ticket: [{task, status, note}].
+    prechecklist_audit = models.JSONField(default=list, blank=True)
+    # Audit flags (visible to super admins only).
     is_flagged = models.BooleanField(default=False)
     flag_reason = models.TextField(blank=True, default="")
-    flag_checklist_items = models.JSONField(default=list, blank=True)
     flagged_at = models.DateTimeField(null=True, blank=True)
     flagged_by = models.CharField(max_length=150, blank=True, default="")
     purpose = models.TextField()

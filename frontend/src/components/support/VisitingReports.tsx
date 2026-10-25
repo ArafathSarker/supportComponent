@@ -31,7 +31,7 @@ import {
   AlertCircle,
   Lock
 } from 'lucide-react';
-import type { VisitingReport, CurrentUser, VisitChecklistItem } from './types';
+import type { VisitingReport, CurrentUser, PrechecklistAuditItem } from './types';
 import { api } from './api';
 import { ScheduleVisitModal } from './ScheduleVisitModal';
 import { AcknowledgeVisitModal } from './AcknowledgeVisitModal';
@@ -68,8 +68,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
 
   // Completion modal with Checklist resolution
   const [completeModalVisit, setCompleteModalVisit] = useState<VisitingReport | null>(null);
-  const [completionChecklist, setCompletionChecklist] = useState<VisitChecklistItem[]>([]);
-  const [completionSuperChecklist, setCompletionSuperChecklist] = useState<VisitChecklistItem[]>([]);
+  const [completionAudit, setCompletionAudit] = useState<PrechecklistAuditItem[]>([]);
   const [completeSummary, setCompleteSummary] = useState('');
   const [flagReason, setFlagReason] = useState('');
   const [completionError, setCompletionError] = useState<string | null>(null);
@@ -153,103 +152,63 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
     setCompletionError(null);
     setFlagReason(report.flag_reason || '');
 
-    // Company-owner checklist with solved/unsolved + audit flag state
-    const existingChecklist = report.visit_checklist || [];
-    if (existingChecklist.length > 0) {
-      setCompletionChecklist(
-        existingChecklist.map((item) => ({
-          ...item,
-          status: item.status === 'unsolved' ? 'unsolved' : 'solved',
-          flagged: Boolean(item.flagged)
-        }))
-      );
-    } else {
-      // Create fallback checklist from purpose
-      const tasks = (report.purpose || 'Calibrate sensors; Test system telemetry').split(/[;\n]/).filter(Boolean);
-      setCompletionChecklist(
-        tasks.map((t, idx) => ({
-          id: `task-${idx}`,
-          task: t.trim(),
-          status: 'solved',
-          flagged: false
-        }))
-      );
-    }
-
-    // Super-admin-only internal checklist
-    setCompletionSuperChecklist(
-      (report.super_admin_checklist || []).map((item) => ({
-        ...item,
-        status: item.status === 'unsolved' ? 'unsolved' : 'solved'
+    // The company's claimed pre-ticket checks, verified on-site.
+    const prechecks = report.ticket_prechecklist || [];
+    setCompletionAudit(
+      prechecks.map((item, index) => ({
+        id: `pre-${index}`,
+        task: item.label,
+        status: item.checked ? 'acknowledged' : 'unverified',
+        note: ''
       }))
     );
 
     setCompleteSummary(report.service_summary || '');
   };
 
-  const toggleChecklistResolution = (id: string) => {
-    setCompletionChecklist((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          return {
-            ...item,
-            status: item.status === 'solved' ? 'unsolved' : 'solved'
-          };
-        }
-        return item;
-      })
-    );
-  };
-
-  const toggleChecklistFlag = (id: string) => {
-    setCompletionChecklist((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, flagged: !item.flagged } : item
-      )
-    );
-    setCompletionError(null);
-  };
-
-  const toggleSuperChecklistResolution = (id: string) => {
-    setCompletionSuperChecklist((prev) =>
+  const setAuditStatus = (id: string | undefined, status: 'acknowledged' | 'flagged') => {
+    setCompletionAudit((prev) =>
       prev.map((item) =>
         item.id === id
-          ? { ...item, status: item.status === 'solved' ? 'unsolved' : 'solved' }
+          ? { ...item, status: item.status === status ? 'unverified' : status }
           : item
       )
     );
+    setCompletionError(null);
   };
 
   const handleCompleteSubmit = async () => {
     if (!completeModalVisit) return;
     try {
       setCompletionError(null);
-      const flaggedItems = completionChecklist.filter((item) => item.flagged);
+      const flaggedItems = completionAudit.filter((item) => item.status === 'flagged');
 
       if (flaggedItems.length > 0 && !flagReason.trim()) {
         setCompletionError(
-          'Add a reason explaining why the company checklist item(s) are being flagged.'
+          'Add a reason explaining why the company pre-ticket check(s) are being flagged.'
         );
         return;
       }
 
       setCompleting(true);
-      const solvedCount = completionChecklist.filter((c) => c.status === 'solved').length;
-      const totalCount = completionChecklist.length;
+      const acknowledgedCount = completionAudit.filter(
+        (item) => item.status === 'acknowledged'
+      ).length;
+      const totalCount = completionAudit.length;
       const summaryText = completeSummary.trim() ||
-        `${solvedCount} of ${totalCount} checklist objectives resolved on-site.`;
+        (totalCount > 0
+          ? `${acknowledgedCount} of ${totalCount} company pre-ticket checks acknowledged on-site.`
+          : 'On-site visit completed.');
 
       const updated = await api.completeVisit(
         completeModalVisit.id,
         summaryText,
         currentUser.name,
         currentUser.role,
-        completionChecklist,
         {
-          super_admin_checklist: completionSuperChecklist,
+          prechecklist_audit: completionAudit,
           is_flagged: flaggedItems.length > 0,
-          flag_reason: flagReason.trim(),
-          flag_checklist_items: flaggedItems
+          flag_reason: flagReason.trim()
         }
       );
       setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
@@ -430,10 +389,11 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 const totalVisitors = report.total_visitors;
                 const showHeadcount =
                   canViewHeadcount(report) && typeof totalVisitors === 'number' && totalVisitors > 0;
-                const checklistItems = report.visit_checklist || [];
-                const superChecklistItems = report.super_admin_checklist || [];
-                const solvedCount = checklistItems.filter((i) => i.status === 'solved').length;
-                const totalChecklist = checklistItems.length;
+                const visitReasons = report.visit_reasons || [];
+                const internalReasons = report.internal_visit_reasons || [];
+                const flaggedAudit = (report.prechecklist_audit || []).filter(
+                  (item) => item.status === 'flagged'
+                );
                 const isExpanded = Boolean(expandedChecklists[report.id]);
 
                 return (
@@ -528,69 +488,31 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         </div>
                       </div>
 
-                      {/* Action Checklist Summary */}
+                      {/* Reason for the visit */}
                       <div className="mt-3 space-y-1">
-                        <div
-                          className={`flex items-center justify-between text-[11px] font-semibold text-slate-700 ${totalChecklist > 3 ? 'cursor-pointer select-none group' : ''
-                            }`}
-                          onClick={() => {
-                            if (totalChecklist > 3) {
-                              toggleChecklistExpand(report.id);
-                            }
-                          }}
-                          title={totalChecklist > 3 ? (isExpanded ? 'Click to show fewer tasks' : 'Click to view all tasks') : undefined}
-                        >
-                          <span className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
+                          <span className="flex items-center gap-1">
                             <ListTodo size={12} className="text-indigo-600" />
-                            <span>Company Owner Checklist</span>
+                            <span>Reason for Visit</span>
                           </span>
-                          {totalChecklist > 0 && (
-                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold transition-colors ${report.status === 'Completed'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : isExpanded
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}>
-                              {report.status === 'Completed'
-                                ? `${solvedCount}/${totalChecklist} Solved`
-                                : `${totalChecklist} Tasks`}
+                          {visitReasons.length > 0 && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              {visitReasons.length} Reason{visitReasons.length !== 1 ? 's' : ''}
                             </span>
                           )}
                         </div>
 
-                        {checklistItems.length > 0 ? (
-                          <div className={`space-y-1 pt-0.5 transition-all ${isExpanded ? 'max-h-60 overflow-y-auto pr-1' : ''
-                            }`}>
-                            {(isExpanded ? checklistItems : checklistItems.slice(0, 3)).map((item, idx) => (
-                              <div key={item.id || idx} className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-tight">
-                                <span className={`mt-0.5 shrink-0 ${item.status === 'solved' ? 'text-emerald-600 font-bold' : 'text-slate-400'
-                                  }`}>
-                                  {item.status === 'solved' ? '✓' : '•'}
-                                </span>
-                                <span className={isExpanded ? 'break-words leading-tight' : 'truncate'}>{item.task}</span>
+                        {visitReasons.length > 0 ? (
+                          <div className="space-y-1 pt-0.5">
+                            {visitReasons.map((reason, idx) => (
+                              <div
+                                key={reason.id || idx}
+                                className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-tight"
+                              >
+                                <span className="mt-0.5 shrink-0 text-indigo-500">•</span>
+                                <span className="break-words leading-tight">{reason.label}</span>
                               </div>
                             ))}
-                            {checklistItems.length > 3 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleChecklistExpand(report.id);
-                                }}
-                                className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 pt-0.5 transition-colors group cursor-pointer focus:outline-none"
-                              >
-                                <span>
-                                  {isExpanded
-                                    ? 'Show less'
-                                    : `+${checklistItems.length - 3} more tasks...`}
-                                </span>
-                                {isExpanded ? (
-                                  <ChevronUp size={12} className="group-hover:-translate-y-0.5 transition-transform" />
-                                ) : (
-                                  <ChevronDown size={12} className="group-hover:translate-y-0.5 transition-transform" />
-                                )}
-                              </button>
-                            )}
                           </div>
                         ) : (
                           <p className="text-[11px] text-slate-500 line-clamp-2">
@@ -599,24 +521,20 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         )}
                       </div>
 
-                      {/* Super Admin Internal Checklist (never shown to company) */}
-                      {isSuperAdmin && superChecklistItems.length > 0 && (
+                      {/* Confidential reason for the visit (never shown to company) */}
+                      {isSuperAdmin && internalReasons.length > 0 && (
                         <div className="mt-2 p-2 bg-purple-50/60 border border-purple-200 rounded-lg space-y-1">
                           <div className="flex items-center justify-between text-[10px] font-bold text-purple-800 uppercase tracking-wide">
                             <span className="flex items-center gap-1">
                               <Lock size={10} />
-                              Internal Checklist
+                              Confidential Reason
                             </span>
-                            <span className="text-purple-600">
-                              {superChecklistItems.filter((i) => i.status === 'solved').length}/{superChecklistItems.length}
-                            </span>
+                            <span className="text-purple-600">{internalReasons.length}</span>
                           </div>
-                          {(isExpanded ? superChecklistItems : superChecklistItems.slice(0, 2)).map((item, idx) => (
-                            <div key={item.id || idx} className="text-[10px] text-purple-900 flex items-start gap-1.5 leading-tight">
-                              <span className={`mt-0.5 shrink-0 ${item.status === 'solved' ? 'text-emerald-600 font-bold' : 'text-purple-400'}`}>
-                                {item.status === 'solved' ? '✓' : '•'}
-                              </span>
-                              <span className="break-words">{item.task}</span>
+                          {internalReasons.map((reason, idx) => (
+                            <div key={reason.id || idx} className="text-[10px] text-purple-900 flex items-start gap-1.5 leading-tight">
+                              <span className="mt-0.5 shrink-0 text-purple-400">•</span>
+                              <span className="break-words">{reason.label}</span>
                             </div>
                           ))}
                         </div>
@@ -627,12 +545,12 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg space-y-1">
                           <div className="text-[10px] font-bold text-red-800 uppercase tracking-wide flex items-center gap-1">
                             <Flag size={11} />
-                            Company Checklist Flagged
+                            Pre-ticket Checks Flagged
                           </div>
                           {report.flag_reason && (
                             <p className="text-[10px] text-red-800 leading-relaxed">{report.flag_reason}</p>
                           )}
-                          {(report.flag_checklist_items || []).map((item, idx) => (
+                          {flaggedAudit.map((item, idx) => (
                             <div key={item.id || idx} className="text-[10px] text-red-700 flex items-start gap-1">
                               <span className="mt-0.5">⚑</span>
                               <span>{item.task}</span>
@@ -725,9 +643,11 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                     const totalVisitors = report.total_visitors;
                     const showHeadcount =
                       canViewHeadcount(report) && typeof totalVisitors === 'number' && totalVisitors > 0;
-                    const checklistItems = report.visit_checklist || [];
-                    const superChecklistItems = report.super_admin_checklist || [];
-                    const solvedCount = checklistItems.filter((i) => i.status === 'solved').length;
+                    const visitReasons = report.visit_reasons || [];
+                    const internalReasons = report.internal_visit_reasons || [];
+                    const flaggedAudit = (report.prechecklist_audit || []).filter(
+                      (item) => item.status === 'flagged'
+                    );
                     const isExpanded = Boolean(expandedChecklists[report.id]);
 
                     return (
@@ -790,49 +710,38 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                           )}
                         </td>
                         <td className="py-3.5 px-4 align-top">
-                          {checklistItems.length > 0 ? (
+                          {visitReasons.length > 0 ? (
                             <div className="space-y-1">
                               <button
                                 type="button"
                                 onClick={() => toggleChecklistExpand(report.id)}
                                 className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
                               >
-                                <span>
-                                  {report.status === 'Completed'
-                                    ? `${solvedCount} / ${checklistItems.length} Solved`
-                                    : `${checklistItems.length} Checklist Tasks`}
-                                </span>
+                                <span>{visitReasons.length} Visit Reason{visitReasons.length !== 1 ? 's' : ''}</span>
                                 {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                               </button>
                               {isExpanded && (
                                 <div className="mt-1.5 p-2 bg-slate-50 rounded-lg border border-slate-200 space-y-1 max-h-48 overflow-y-auto text-[11px] text-slate-600 shadow-inner">
                                   <div className="text-[9px] font-bold uppercase tracking-wide text-indigo-700">
-                                    Company Owner Checklist
+                                    Reason for Visit
                                   </div>
-                                  {checklistItems.map((item, idx) => (
-                                    <div key={item.id || idx} className="flex items-start gap-1.5 leading-tight">
-                                      <span className={`mt-0.5 shrink-0 ${item.status === 'solved' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
-                                        {item.status === 'solved' ? '✓' : '•'}
-                                      </span>
-                                      <span className="break-words">{item.task}</span>
-                                      {isSuperAdmin && item.flagged && (
-                                        <Flag size={9} className="text-red-500 shrink-0 mt-0.5" />
-                                      )}
+                                  {visitReasons.map((reason, idx) => (
+                                    <div key={reason.id || idx} className="flex items-start gap-1.5 leading-tight">
+                                      <span className="mt-0.5 shrink-0 text-indigo-500">•</span>
+                                      <span className="break-words">{reason.label}</span>
                                     </div>
                                   ))}
 
-                                  {isSuperAdmin && superChecklistItems.length > 0 && (
+                                  {isSuperAdmin && internalReasons.length > 0 && (
                                     <div className="mt-1.5 pt-1.5 border-t border-purple-200 space-y-1">
                                       <div className="text-[9px] font-bold uppercase tracking-wide text-purple-700 flex items-center gap-1">
                                         <Lock size={9} />
-                                        Internal Checklist
+                                        Confidential Reason
                                       </div>
-                                      {superChecklistItems.map((item, idx) => (
-                                        <div key={item.id || idx} className="flex items-start gap-1.5 leading-tight text-purple-900">
-                                          <span className={`mt-0.5 shrink-0 ${item.status === 'solved' ? 'text-emerald-600 font-bold' : 'text-purple-400'}`}>
-                                            {item.status === 'solved' ? '✓' : '•'}
-                                          </span>
-                                          <span className="break-words">{item.task}</span>
+                                      {internalReasons.map((reason, idx) => (
+                                        <div key={reason.id || idx} className="flex items-start gap-1.5 leading-tight text-purple-900">
+                                          <span className="mt-0.5 shrink-0 text-purple-400">•</span>
+                                          <span className="break-words">{reason.label}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -842,12 +751,12 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                                     <div className="mt-1.5 pt-1.5 border-t border-red-200 space-y-1">
                                       <div className="text-[9px] font-bold uppercase tracking-wide text-red-700 flex items-center gap-1">
                                         <ShieldAlert size={9} />
-                                        Audit Flag
+                                        Pre-ticket Checks Flagged
                                       </div>
                                       {report.flag_reason && (
                                         <p className="text-[10px] text-red-700 leading-tight">{report.flag_reason}</p>
                                       )}
-                                      {(report.flag_checklist_items || []).map((item, idx) => (
+                                      {flaggedAudit.map((item, idx) => (
                                         <div key={item.id || idx} className="text-[10px] text-red-700 flex items-start gap-1">
                                           <span>⚑</span>
                                           <span>{item.task}</span>
@@ -1061,106 +970,110 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 </div>
               )}
 
-              {/* Company-owner checklist resolution + audit flags */}
+              {/* Audit of the company's claimed pre-ticket checks */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
                     <ListTodo size={14} className="text-indigo-600" />
-                    <span>Company Owner Checklist Resolution</span>
+                    <span>Company Pre-Ticket Checklist Audit</span>
                   </label>
                   <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                    {completionChecklist.filter(c => c.status === 'solved').length} of {completionChecklist.length} Solved
+                    {completionAudit.filter((c) => c.status === 'acknowledged').length} of {completionAudit.length} Acknowledged
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Mark what was solved on-site. If the company claimed a pre-visit item was handled but
-                  your team found it was not, use <strong className="text-red-600">Flag</strong>. Flags are
-                  visible to Super Admins only.
+                  These are the checks the company had to verify before raising the ticket. Acknowledge
+                  the ones that really were done. If the fault was simple enough that following the
+                  checklist would have avoided the visit, use <strong className="text-red-600">Flag</strong>.
+                  Flags are visible to Super Admins only.
                 </p>
 
-                <div className="space-y-2 max-h-64 overflow-y-auto pt-1 pr-1">
-                  {completionChecklist.map((item, idx) => {
-                    const isSolved = item.status === 'solved';
-                    return (
-                      <div
-                        key={item.id || idx}
-                        className={`p-3 rounded-xl border transition-all space-y-2 ${
-                          item.flagged
-                            ? 'bg-red-50 border-red-300'
-                            : isSolved
-                              ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
-                              : 'bg-amber-50/70 border-amber-200 text-amber-950'
-                        }`}
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <span className={`w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
-                            item.flagged
-                              ? 'bg-red-200 text-red-800'
-                              : isSolved
-                                ? 'bg-emerald-200 text-emerald-800'
-                                : 'bg-amber-200 text-amber-800'
-                          }`}>
-                            {idx + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-semibold leading-relaxed block">
-                              {item.task}
+                {completionAudit.length === 0 ? (
+                  <div className="p-3 text-[11px] text-slate-500 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
+                    This visit is not linked to a ticket with pre-ticket checks, so there is nothing to audit.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto pt-1 pr-1">
+                    {completionAudit.map((item, idx) => {
+                      const isAcknowledged = item.status === 'acknowledged';
+                      const isFlagged = item.status === 'flagged';
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className={`p-3 rounded-xl border transition-all space-y-2 ${
+                            isFlagged
+                              ? 'bg-red-50 border-red-300'
+                              : isAcknowledged
+                                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                                : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <span className={`w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
+                              isFlagged
+                                ? 'bg-red-200 text-red-800'
+                                : isAcknowledged
+                                  ? 'bg-emerald-200 text-emerald-800'
+                                  : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {idx + 1}
                             </span>
-                            <span
-                              className={`inline-flex items-center gap-1 text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded border ${
-                                item.company_checked
-                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-semibold leading-relaxed block">
+                                {item.task}
+                              </span>
+                              <span className={`inline-flex items-center gap-1 text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded border ${
+                                isFlagged
+                                  ? 'bg-red-100 text-red-800 border-red-200'
+                                  : isAcknowledged
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                              }`}>
+                                {isFlagged
+                                  ? 'Claimed by company but not actually done'
+                                  : isAcknowledged
+                                    ? 'Acknowledged: the company really did this'
+                                    : 'Not reviewed on-site yet'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAuditStatus(item.id, 'acknowledged')}
+                              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 ${
+                                isAcknowledged
+                                  ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                                  : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
                               }`}
                             >
-                              {item.company_checked
-                                ? '✓ Company confirmed this pre-visit task as done'
-                                : 'Company did not confirm this pre-visit task'}
-                            </span>
+                              <CheckCircle2 size={12} />
+                              <span>Acknowledge</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAuditStatus(item.id, 'flagged')}
+                              title="Flag this check: it was claimed but not actually done"
+                              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 border ${
+                                isFlagged
+                                  ? 'bg-red-600 text-white border-red-600 hover:bg-red-500'
+                                  : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
+                              }`}
+                            >
+                              <Flag size={12} />
+                              <span>Flag</span>
+                            </button>
                           </div>
-                          {item.flagged && (
-                            <span className="text-[9px] font-bold uppercase tracking-wide text-red-700 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
-                              <Flag size={9} />
-                              Flagged
-                            </span>
-                          )}
                         </div>
-
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => toggleChecklistResolution(item.id)}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 ${
-                              isSolved
-                                ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                                : 'bg-amber-600 text-white hover:bg-amber-500'
-                            }`}
-                          >
-                            {isSolved ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-                            <span>{isSolved ? 'Solved' : 'Unsolved'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleChecklistFlag(item.id)}
-                            title="Flag this item: company claimed it was handled but it was not"
-                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 border ${
-                              item.flagged
-                                ? 'bg-red-600 text-white border-red-600 hover:bg-red-500'
-                                : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
-                            }`}
-                          >
-                            <Flag size={12} />
-                            <span>{item.flagged ? 'Unflag' : 'Flag'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Flag reason */}
                 <div className={`space-y-1.5 rounded-xl border p-3 ${
-                  completionChecklist.some((item) => item.flagged)
+                  completionAudit.some((item) => item.status === 'flagged')
                     ? 'bg-red-50/70 border-red-200'
                     : 'bg-slate-50 border-slate-200'
                 }`}>
@@ -1169,7 +1082,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                       <ShieldAlert size={12} className="text-red-500" />
                       Audit Flag Reason
                     </span>
-                    {completionChecklist.some((item) => item.flagged) && (
+                    {completionAudit.some((item) => item.status === 'flagged') && (
                       <span className="text-[10px] text-red-600 font-bold">Required</span>
                     )}
                   </label>
@@ -1186,58 +1099,23 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 </div>
               </div>
 
-              {/* Super Admin internal checklist resolution */}
-              <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
+              {/* Confidential reason for the visit (provider only) */}
+              {(completeModalVisit.internal_visit_reasons || []).length > 0 && (
+                <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-3.5 space-y-2">
                   <label className="text-xs font-bold text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
                     <Lock size={13} className="text-purple-600" />
-                    <span>Super Admin Internal Checklist</span>
+                    <span>Confidential Reason for this Visit</span>
                   </label>
-                  <span className="text-[10px] font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded border border-purple-200">
-                    {completionSuperChecklist.filter(c => c.status === 'solved').length} of {completionSuperChecklist.length} Solved
-                  </span>
-                </div>
-
-                {completionSuperChecklist.length === 0 ? (
-                  <p className="text-[11px] text-purple-700/70">
-                    No internal checks were added for this visit. Build them from Support Ticket
-                    Management dropdown options when dispatching a visit.
-                  </p>
-                ) : (
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {completionSuperChecklist.map((item, idx) => {
-                      const isSolved = item.status === 'solved';
-                      return (
-                        <div
-                          key={item.id || idx}
-                          className="p-2.5 rounded-lg border border-purple-200 bg-white flex items-center justify-between gap-2"
-                        >
-                          <div className="flex items-start gap-2 flex-1 pr-2">
-                            <span className="w-5 h-5 rounded-full bg-purple-50 border border-purple-200 text-purple-700 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                              {idx + 1}
-                            </span>
-                            <span className="text-[11px] font-semibold text-slate-800 leading-relaxed">
-                              {item.task}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => toggleSuperChecklistResolution(item.id)}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all shadow-xs flex items-center gap-1 shrink-0 ${
-                              isSolved
-                                ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                                : 'bg-amber-600 text-white hover:bg-amber-500'
-                            }`}
-                          >
-                            {isSolved ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
-                            <span>{isSolved ? 'Solved' : 'Unsolved'}</span>
-                          </button>
-                        </div>
-                      );
-                    })}
+                  <div className="space-y-1">
+                    {(completeModalVisit.internal_visit_reasons || []).map((reason, idx) => (
+                      <div key={reason.id || idx} className="text-[11px] text-purple-900 flex items-start gap-1.5">
+                        <span className="mt-0.5 shrink-0 text-purple-400">•</span>
+                        <span className="break-words">{reason.label}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Service Summary & Field Notes */}
               <div className="space-y-1.5">
@@ -1257,11 +1135,11 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
             {/* Footer */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
               <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                {completionChecklist.some((item) => item.flagged) ? (
+                {completionAudit.some((item) => item.status === 'flagged') ? (
                   <>
                     <Flag size={12} className="text-red-500" />
                     <span className="text-red-600 font-semibold">
-                      {completionChecklist.filter((item) => item.flagged).length} item(s) flagged
+                      {completionAudit.filter((item) => item.status === 'flagged').length} check(s) flagged
                     </span>
                   </>
                 ) : (
@@ -1289,7 +1167,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                   {completing ? (
                     'Saving Completion...'
                   ) : (
-                    `Confirm Visit Completed (${completionChecklist.filter(c => c.status === 'solved').length}/${completionChecklist.length} Solved)`
+                    `Confirm Visit Completed (${completionAudit.filter((c) => c.status === 'acknowledged').length}/${completionAudit.length} Acknowledged)`
                   )}
                 </button>
               </div>

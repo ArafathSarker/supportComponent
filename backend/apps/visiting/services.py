@@ -1,5 +1,5 @@
 from django.utils import timezone
-from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.exceptions import PermissionDenied, NotFound, ValidationError
 
 from apps.core.utils import generate_visit_code
 from apps.core.events import broadcast_global_event
@@ -31,6 +31,35 @@ def _normalize_team_members(raw_members) -> list:
             'name': name,
             'phone': (member.get('phone') or '').strip(),
             'designation': (member.get('designation') or '').strip(),
+        })
+    return normalized
+
+
+def _normalize_reasons(raw_reasons) -> list:
+    """
+    Normalize the visit reasons picked from the managed option lists.
+
+    Reasons are not tasks: they keep only their identity and their text.
+    """
+    normalized = []
+    seen = set()
+    for index, reason in enumerate(raw_reasons or []):
+        if isinstance(reason, str):
+            reason = {'label': reason}
+        if not isinstance(reason, dict):
+            continue
+        label = (reason.get('label') or reason.get('task') or '').strip()
+        if not label:
+            continue
+        option_id = reason.get('option_id') or ''
+        dedupe_key = option_id or label.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        normalized.append({
+            'id': reason.get('id') or f'reason-{index + 1}',
+            'label': label,
+            'option_id': option_id,
         })
     return normalized
 
@@ -110,6 +139,16 @@ class VisitingReportService:
         team_members = _normalize_team_members(data.get('visiting_team_members'))
         team_names = ", ".join(member['name'] for member in team_members)
 
+        visit_reasons = _normalize_reasons(data.get('visit_reasons'))
+        if not visit_reasons:
+            raise ValidationError(
+                {'visit_reasons': 'Select at least one reason for the factory visit.'}
+            )
+        internal_visit_reasons = _normalize_reasons(data.get('internal_visit_reasons'))
+        purpose = (data.get('purpose') or '').strip() or '; '.join(
+            reason['label'] for reason in visit_reasons
+        )
+
         lead_engineer = (
             lead_employee.name if lead_employee
             else (data.get('lead_engineer') or data.get('visiting_engineers', ''))
@@ -144,10 +183,10 @@ class VisitingReportService:
             visiting_team_names=team_names or data.get('visiting_team_names', ''),
             visiting_team_members=team_members,
             total_visitors=total_visitors,
-            visit_checklist=data.get('visit_checklist', []),
-            super_admin_checklist=data.get('super_admin_checklist', []),
+            visit_reasons=visit_reasons,
+            internal_visit_reasons=internal_visit_reasons,
             show_visitor_count=data.get('show_visitor_count', True),
-            purpose=data.get('purpose', ''),
+            purpose=purpose,
             scheduled_date=data['scheduled_date'],
             estimated_duration=data.get('estimated_duration', '2 Hours'),
             entry_requirements=data.get('entry_requirements', 'Standard Factory Safety Equipment & Gate Pass'),
@@ -174,50 +213,17 @@ class VisitingReportService:
         return report
 
     @staticmethod
-    def _merge_company_checklist(existing, company_items) -> list:
-        """
-        Apply the company's `company_checked` confirmations to the provider-owned
-        checklist. Task text, ids and status are never rewritten by the client.
-        """
-        if not isinstance(existing, list):
-            return existing
-
-        confirmations = {}
-        for index, item in enumerate(company_items or []):
-            if not isinstance(item, dict):
-                continue
-            key = item.get('id') or index
-            confirmations[key] = bool(item.get('company_checked'))
-
-        merged = []
-        for index, item in enumerate(existing):
-            if not isinstance(item, dict):
-                merged.append(item)
-                continue
-            key = item.get('id') or index
-            merged_item = dict(item)
-            if key in confirmations:
-                merged_item['company_checked'] = confirmations[key]
-            merged.append(merged_item)
-        return merged
-
-    @staticmethod
     def acknowledge_report(
         report: VisitingReport,
         notes: str,
         user_name: str,
         user_role: str,
-        visit_checklist: list = None,
     ) -> VisitingReport:
         if user_role == 'super_admin':
             raise PermissionDenied("Only Company Owner/Admin can acknowledge visiting reports.")
 
         report.status = "Acknowledged"
         report.company_acknowledgement_notes = notes
-        if visit_checklist is not None:
-            report.visit_checklist = VisitingReportService._merge_company_checklist(
-                report.visit_checklist, visit_checklist
-            )
         report.acknowledged_at = timezone.now()
         report.acknowledged_by = user_name or "Company Admin"
         report.save()
@@ -237,39 +243,66 @@ class VisitingReportService:
         return report
 
     @staticmethod
+    def _normalize_prechecklist_audit(raw_audit) -> list:
+        """
+        Normalize the audit of the problem-category pre-ticket checks.
+
+        Each item is `{id, task, status, note}` where status is one of
+        `acknowledged` (the company really did it) or `flagged` (it was claimed
+        but the on-site team found it was not done).
+        """
+        normalized = []
+        for index, item in enumerate(raw_audit or []):
+            if not isinstance(item, dict):
+                continue
+            task = (item.get('task') or item.get('label') or '').strip()
+            if not task:
+                continue
+            status = item.get('status')
+            if status not in ('acknowledged', 'flagged'):
+                status = 'acknowledged' if item.get('checked') else 'unverified'
+            normalized.append({
+                'id': item.get('id') or f'pre-{index + 1}',
+                'task': task,
+                'status': status,
+                'note': (item.get('note') or '').strip(),
+            })
+        return normalized
+
+    @staticmethod
     def complete_report(
         report: VisitingReport,
         service_summary: str,
         user_name: str,
         user_role: str,
-        visit_checklist: list = None,
-        super_admin_checklist: list = None,
+        prechecklist_audit: list = None,
         is_flagged: bool = False,
         flag_reason: str = '',
-        flag_checklist_items: list = None,
     ) -> VisitingReport:
         if user_role == 'company_admin':
             raise PermissionDenied("Only Solution Provider engineers (super_admin) can mark visiting reports completed.")
 
         report.status = "Completed"
-        if visit_checklist is not None:
-            report.visit_checklist = visit_checklist
-        if super_admin_checklist is not None:
-            report.super_admin_checklist = super_admin_checklist
+        audit = VisitingReportService._normalize_prechecklist_audit(prechecklist_audit)
+        report.prechecklist_audit = audit
+
         if service_summary:
             report.service_summary = service_summary
-        elif not report.service_summary and visit_checklist:
-            solved_count = sum(1 for item in visit_checklist if item.get('status') == 'solved')
-            total_count = len(visit_checklist)
-            report.service_summary = f"{solved_count} of {total_count} checklist objectives resolved."
+        elif not report.service_summary:
+            flagged_count = sum(1 for item in audit if item['status'] == 'flagged')
+            report.service_summary = (
+                f"{flagged_count} pre-ticket check(s) were flagged during the on-site audit."
+                if flagged_count
+                else "On-site visit completed."
+            )
 
-        # Audit flag: the company claimed a pre-visit checklist item was handled,
-        # but the on-site team found it was not. Visible to super admins only.
-        report.is_flagged = bool(is_flagged)
-        report.flag_reason = (flag_reason or '') if is_flagged else ''
-        report.flag_checklist_items = list(flag_checklist_items or []) if is_flagged else []
-        report.flagged_at = timezone.now() if is_flagged else None
-        report.flagged_by = (user_name or 'Field Engineer') if is_flagged else ''
+        # Audit flag: the company claimed a pre-ticket check was handled, but the
+        # on-site team found it was not. Visible to super admins only.
+        has_flagged_items = any(item['status'] == 'flagged' for item in audit)
+        report.is_flagged = bool(is_flagged) or has_flagged_items
+        report.flag_reason = (flag_reason or '') if report.is_flagged else ''
+        report.flagged_at = timezone.now() if report.is_flagged else None
+        report.flagged_by = (user_name or 'Field Engineer') if report.is_flagged else ''
 
         report.completed_at = timezone.now()
         report.save()
@@ -291,14 +324,14 @@ class VisitingReportService:
 
     @staticmethod
     def update_report(report: VisitingReport, data: dict, user_role: str) -> VisitingReport:
-        """Super admin maintenance of a scheduled visit (headcount visibility, internal checklist)."""
+        """Super admin maintenance of a scheduled visit (headcount visibility, confidential reason)."""
         if user_role == 'company_admin':
             raise PermissionDenied("Only Solution Provider engineers (super_admin) can update visiting reports.")
 
         if 'show_visitor_count' in data:
             report.show_visitor_count = data['show_visitor_count']
-        if 'super_admin_checklist' in data:
-            report.super_admin_checklist = data['super_admin_checklist']
+        if 'internal_visit_reasons' in data:
+            report.internal_visit_reasons = _normalize_reasons(data['internal_visit_reasons'])
         if 'super_admin_notes' in data:
             report.super_admin_notes = data['super_admin_notes']
 

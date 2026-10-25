@@ -37,6 +37,7 @@ class ChecklistOptionSerializer(serializers.ModelSerializer):
         model = ChecklistOption
         fields = [
             'id',
+            'kind',
             'label',
             'category',
             'sort_order',
@@ -51,3 +52,14 @@ class ChecklistOptionSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError('Option label is required.')
         return value
+
+    def validate(self, attrs):
+        kind = attrs.get('kind', getattr(self.instance, 'kind', ChecklistOption.KIND_VISIT_REASON))
+        category = attrs.get(
+            'category', getattr(self.instance, 'category', 'General')
+        )
+        if kind == ChecklistOption.KIND_PRECHECKLIST and not (category or '').strip():
+            raise serializers.ValidationError(
+                {'category': 'A problem category is required for pre-ticket check items.'}
+            )
+        return attrs

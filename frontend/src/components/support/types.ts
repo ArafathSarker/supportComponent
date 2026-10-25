@@ -14,8 +14,11 @@ export interface SupportEmployee {
   updated_at?: string;
 }
 
+export type ChecklistOptionKind = 'visit_reason' | 'internal_reason' | 'prechecklist';
+
 export interface ChecklistOption {
   id: string;
+  kind: ChecklistOptionKind;
   label: string;
   category?: string;
   sort_order?: number;
@@ -90,6 +93,7 @@ export interface Ticket {
   factory_section?: string;
   iot_details?: Record<string, any>;
   troubleshooting_checklist?: string[];
+  prechecklist?: PrechecklistItem[];
   support_severity?: string;
   assigned_engineer?: string;
   occurrence?: string;
@@ -134,14 +138,29 @@ export type VisitStatus =
   | 'Completed' 
   | 'Cancelled';
 
-export interface VisitChecklistItem {
-  id: string;
-  task: string;
-  status?: 'pending' | 'solved' | 'unsolved';
+/**
+ * A reason for visiting the factory, picked from the options managed in
+ * Support Ticket Management. Public reasons are shared with the company owner;
+ * confidential ones stay with the solution provider.
+ */
+export interface VisitReason {
+  id?: string;
+  label: string;
   option_id?: string;
-  company_checked?: boolean;
-  flagged?: boolean;
-  flag_note?: string;
+}
+
+/** A problem-category pre-ticket check the company must verify before raising a ticket. */
+export interface PrechecklistItem {
+  label: string;
+  checked: boolean;
+}
+
+/** On-site verdict for a pre-ticket check the company claimed to have done. */
+export interface PrechecklistAuditItem {
+  id?: string;
+  task: string;
+  status: 'acknowledged' | 'flagged' | 'unverified';
+  note?: string;
 }
 
 export interface VisitingReport {
@@ -160,12 +179,13 @@ export interface VisitingReport {
   visiting_team_names?: string;
   visiting_team_members?: VisitingTeamMember[];
   total_visitors?: number;
-  visit_checklist?: VisitChecklistItem[];
-  super_admin_checklist?: VisitChecklistItem[];
+  ticket_prechecklist?: PrechecklistItem[];
+  visit_reasons?: VisitReason[];
+  internal_visit_reasons?: VisitReason[];
   show_visitor_count?: boolean;
+  prechecklist_audit?: PrechecklistAuditItem[];
   is_flagged?: boolean;
   flag_reason?: string;
-  flag_checklist_items?: VisitChecklistItem[];
   flagged_at?: string;
   flagged_by?: string;
   purpose: string;

@@ -47,6 +47,7 @@ class TicketListSerializer(serializers.ModelSerializer):
             'machine_id',
             'iot_details',
             'troubleshooting_checklist',
+            'prechecklist',
             'support_severity',
             'assigned_engineer',
             'occurrence',
@@ -99,6 +100,7 @@ class TicketDetailSerializer(serializers.ModelSerializer):
             'machine_id',
             'iot_details',
             'troubleshooting_checklist',
+            'prechecklist',
             'support_severity',
             'assigned_engineer',
             'occurrence',
@@ -147,6 +149,11 @@ class TicketCreateSerializer(serializers.Serializer):
         required=False,
         default=list
     )
+    prechecklist = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        default=list
+    )
     description = serializers.CharField()
     company_name = serializers.CharField(max_length=150, default="CSI Smart Tech Ltd", required=False)
     created_by_name = serializers.CharField(max_length=100, default="Arafath", required=False)
@@ -173,6 +180,7 @@ class TicketUpdateSerializer(serializers.Serializer):
     machine_id = serializers.CharField(max_length=100, required=False, allow_blank=True)
     iot_details = serializers.DictField(required=False)
     troubleshooting_checklist = serializers.ListField(child=serializers.CharField(), required=False)
+    prechecklist = serializers.ListField(child=serializers.DictField(), required=False)
     description = serializers.CharField(required=False)
 
 

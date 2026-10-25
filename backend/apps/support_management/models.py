@@ -34,12 +34,30 @@ class SupportEmployee(models.Model):
 
 class ChecklistOption(models.Model):
     """
-    Dynamic dropdown option for the Super Admin's internal visit checklist.
+    Dynamic option managed in Support Ticket Management.
 
-    Options are managed in Support Ticket Management and are never exposed to
-    company admins; they are used to build the internal on-site checklist.
+    These are reasons for a factory visit, not task checklists:
+      * `visit_reason`     - the reason shared with the company owner.
+      * `internal_reason`  - the confidential reason the visit is really made for.
+      * `prechecklist`     - a pre-ticket check item that belongs to a problem
+        category (`category`). It must be verified before a ticket is raised.
     """
+    KIND_VISIT_REASON = 'visit_reason'
+    KIND_INTERNAL_REASON = 'internal_reason'
+    KIND_PRECHECKLIST = 'prechecklist'
+    KIND_CHOICES = [
+        (KIND_VISIT_REASON, 'Reason for visit (visible to client)'),
+        (KIND_INTERNAL_REASON, 'Confidential reason for visit'),
+        (KIND_PRECHECKLIST, 'Problem category pre-ticket check'),
+    ]
+
     id = models.CharField(primary_key=True, default=generate_uuid, max_length=36, editable=False)
+    kind = models.CharField(
+        max_length=30,
+        choices=KIND_CHOICES,
+        default=KIND_VISIT_REASON,
+        db_index=True,
+    )
     label = models.CharField(max_length=255, unique=True)
     category = models.CharField(max_length=100, blank=True, default='General')
     sort_order = models.IntegerField(default=0)

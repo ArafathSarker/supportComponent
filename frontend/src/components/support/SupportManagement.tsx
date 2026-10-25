@@ -115,10 +115,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center shadow-sm">
         <Lock size={28} className="text-slate-300 mx-auto mb-2" />
-        <h3 className="text-sm font-bold text-slate-800">Super Admin access only</h3>
-        <p className="text-xs text-slate-500 mt-1">
-          Support Ticket Management is restricted to the Solution Provider.
-        </p>
+        <h3 className="text-sm font-bold text-slate-800">Access Restricted</h3>
       </div>
     );
   }
@@ -426,26 +423,15 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
   return (
     <div className="w-full space-y-5">
       {/* Page Header */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 shadow-sm">
             <ShieldCheck size={20} />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-900 tracking-tight">
-              Support Ticket Management
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
-              Maintain the support employee directory, the visit reasons shared with clients, the
-              confidential reasons for a visit, and the dynamic problem categories with the
-              pre-ticket checks a ticket must satisfy.
-            </p>
-          </div>
+          <h2 className="text-base font-bold text-slate-900 tracking-tight">
+            Support Ticket Management
+          </h2>
         </div>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-semibold">
-          <Lock size={12} />
-          Super Admin only
-        </span>
       </div>
 
       {loading ? (
@@ -493,7 +479,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                     type="text"
                     value={employeeForm.name}
                     onChange={(e) => setEmployeeForm((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g. Engr. Rezaul Karim"
                     className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
                     required
                   />
@@ -506,7 +491,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                     type="text"
                     value={employeeForm.phone}
                     onChange={(e) => setEmployeeForm((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="e.g. +880 1712-345678"
                     className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
                     required
                   />
@@ -517,7 +501,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                     type="text"
                     value={employeeForm.designation}
                     onChange={(e) => setEmployeeForm((prev) => ({ ...prev, designation: e.target.value }))}
-                    placeholder="e.g. Field Service Engineer"
                     className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
                   />
                 </div>
@@ -527,7 +510,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                     type="text"
                     value={employeeForm.department}
                     onChange={(e) => setEmployeeForm((prev) => ({ ...prev, department: e.target.value }))}
-                    placeholder="e.g. Field Service"
                     className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
                   />
                 </div>
@@ -594,7 +576,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                   type="text"
                   value={employeeSearch}
                   onChange={(e) => setEmployeeSearch(e.target.value)}
-                  placeholder="Search employees by name, phone, designation..."
                   className="w-full bg-slate-50 border border-slate-300 text-slate-800 pl-8 pr-3 py-2 rounded-lg text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
                 />
               </div>
@@ -737,7 +718,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                   type="text"
                   value={optionForm.label}
                   onChange={(e) => setOptionForm((prev) => ({ ...prev, label: e.target.value }))}
-                  placeholder="e.g. Scheduled preventive maintenance of IoT hardware"
                   className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm"
                   required
                 />
@@ -750,7 +730,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                     type="text"
                     value={optionForm.category}
                     onChange={(e) => setOptionForm((prev) => ({ ...prev, category: e.target.value }))}
-                    placeholder="e.g. Maintenance"
                     className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm"
                   />
                 </div>
@@ -826,7 +805,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                   type="text"
                   value={optionSearch}
                   onChange={(e) => setOptionSearch(e.target.value)}
-                  placeholder="Search options..."
                   className="w-full bg-slate-50 border border-slate-300 text-slate-800 pl-8 pr-3 py-2 rounded-lg text-xs focus:bg-white focus:outline-none focus:border-purple-500 shadow-sm"
                 />
                 {optionSearch && (
@@ -957,7 +935,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                   type="text"
                   value={categoryForm.name}
                   onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Chiller Telemetry / Temperature Probe Fault"
                   className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500 shadow-sm"
                   required
                 />
@@ -981,7 +958,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                 type="text"
                 value={categoryForm.description}
                 onChange={(e) => setCategoryForm((prev) => ({ ...prev, description: e.target.value }))}
-                placeholder="e.g. Temperature, humidity and chiller performance telemetry"
                 className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500 shadow-sm"
               />
             </div>
@@ -995,9 +971,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                   {categoryForm.checklist.filter((item) => item.trim()).length} check item(s)
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">
-                The company must verify every item before it can raise a ticket in this category.
-              </p>
 
               <div className="space-y-1.5">
                 {categoryForm.checklist.map((item, index) => (
@@ -1009,7 +982,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                       type="text"
                       value={item}
                       onChange={(e) => updateChecklistRow(index, e.target.value)}
-                      placeholder="e.g. Cleared lint from the optical sensor lens"
                       className="flex-1 bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500 shadow-sm"
                     />
                     <button
@@ -1080,7 +1052,6 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                 type="text"
                 value={categorySearch}
                 onChange={(e) => setCategorySearch(e.target.value)}
-                placeholder="Search categories or their check items..."
                 className="w-full bg-slate-50 border border-slate-300 text-slate-800 pl-8 pr-3 py-2 rounded-lg text-xs focus:bg-white focus:outline-none focus:border-amber-500 shadow-sm"
               />
               {categorySearch && (

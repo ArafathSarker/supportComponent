@@ -462,18 +462,35 @@ def test_visit_prechecklist_audit_is_super_admin_only(client):
 
     ack = client.post(
         f"/api/visiting/{visit_id}/acknowledge/",
-        data={"acknowledged_by": "Arafath", "company_acknowledgement_notes": "Gate pass ready."},
+        data={
+            "acknowledged_by": "Arafath",
+            "company_acknowledgement_notes": "Gate pass ready.",
+            "host_name": "Mr. Rafiq (Factory Maintenance Lead)",
+        },
         headers={"x-user-role": "company_admin"},
         format="json",
     )
     assert ack.status_code == 200
     assert ack.json()["status"] == "Acknowledged"
 
+    # The final confirmation must state whether the visit solved the problem.
+    missing_verdict = client.post(
+        f"/api/visiting/{visit_id}/complete/",
+        data={
+            "service_summary": "Sensor was never cleaned; lint blockage found on-site.",
+            "prechecklist_audit": [],
+        },
+        headers={"x-user-role": "super_admin"},
+        format="json",
+    )
+    assert missing_verdict.status_code == 400
+    assert "is_resolved" in missing_verdict.json()
+
     audit = [
         {
             "id": f"pre-{index}",
             "task": item,
-            "status": "flagged" if index == 0 else "acknowledged",
+            "status": "flagged" if index == 0 else "unverified",
         }
         for index, item in enumerate(prechecks)
     ]
@@ -483,6 +500,8 @@ def test_visit_prechecklist_audit_is_super_admin_only(client):
             "service_summary": "Sensor was never cleaned; lint blockage found on-site.",
             "prechecklist_audit": audit,
             "flag_reason": "Company marked the lint cleaning as done but the sensor was fouled.",
+            "is_resolved": False,
+            "resolution_notes": "Cleaning restored readings but the probe needs replacement.",
         },
         headers={"x-user-role": "super_admin"},
         format="json",
@@ -492,7 +511,8 @@ def test_visit_prechecklist_audit_is_super_admin_only(client):
     assert completed["is_flagged"] is True
     assert "fouled" in completed["flag_reason"]
     assert completed["prechecklist_audit"][0]["status"] == "flagged"
-    assert completed["prechecklist_audit"][1]["status"] == "acknowledged"
+    assert completed["prechecklist_audit"][1]["status"] == "unverified"
+    assert completed["is_resolved"] is False
     assert completed["flagged_by"] == "Field Engineer"
 
     # Super admin sees the audit trail
@@ -514,3 +534,6 @@ def test_visit_prechecklist_audit_is_super_admin_only(client):
     assert "prechecklist_audit" not in company_item
     assert "internal_visit_reasons" not in company_item
     assert company_item["visit_reasons"][0]["label"] == "Recurring telemetry / sensor fault investigation"
+    # The problem verdict and the welcoming person are shared with the company.
+    assert company_item["is_resolved"] is False
+    assert company_item["host_name"] == "Mr. Rafiq (Factory Maintenance Lead)"

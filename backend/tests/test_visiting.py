@@ -58,13 +58,17 @@ def test_visiting_report_workflow(client):
         f"/api/visiting/{visit_id}/acknowledge/",
         data={
             "acknowledged_by": "Arafath",
-            "company_acknowledgement_notes": "Gate pass #GP-1044 is registered."
+            "company_acknowledgement_notes": "Gate pass #GP-1044 is registered.",
+            "host_name": "Mr. Rafiq (Factory Maintenance Lead)",
+            "host_phone": "+880 1700-000000",
         },
         headers={"x-user-role": "company_admin"},
         format="json"
     )
     assert ack_res.status_code == 200
     assert ack_res.json()["status"] == "Acknowledged"
+    assert ack_res.json()["host_name"] == "Mr. Rafiq (Factory Maintenance Lead)"
+    assert ack_res.json()["host_phone"] == "+880 1700-000000"
 
     # 4. Super Admin completes the visit
     comp_res = client.post(
@@ -72,17 +76,36 @@ def test_visiting_report_workflow(client):
         data={
             "service_summary": "Thermal imaging audit finished without anomalies. Probes calibrated.",
             "prechecklist_audit": [
-                {"id": "pre-1", "task": "Cleaned optical sensor lens", "status": "acknowledged"}
-            ]
+                {"id": "pre-1", "task": "Cleaned optical sensor lens", "status": "unverified"}
+            ],
+            "is_resolved": True,
+            "resolution_notes": "Probe drift corrected and verified against the reference gauge.",
         },
         headers={"x-user-role": "super_admin"},
         format="json"
     )
     assert comp_res.status_code == 200
     assert comp_res.json()["status"] == "Completed"
+    assert comp_res.json()["is_resolved"] is True
+    assert "Probe drift" in comp_res.json()["resolution_notes"]
     assert "audit finished" in comp_res.json()["service_summary"]
 
-    # 5. Test filtering by status, priority, and search query
+    # 5. Company Admin confirms resolution from factory side
+    client_confirm_res = client.post(
+        f"/api/visiting/{visit_id}/confirm-resolution/",
+        data={
+            "client_is_resolved": True,
+            "client_resolution_notes": "Factory test run passed with zero sensor drift.",
+            "client_resolved_by": "Arafath",
+        },
+        headers={"x-user-role": "company_admin"},
+        format="json"
+    )
+    assert client_confirm_res.status_code == 200
+    assert client_confirm_res.json()["client_is_resolved"] is True
+    assert "Factory test run" in client_confirm_res.json()["client_resolution_notes"]
+
+    # 6. Test filtering by status, priority, and search query
     list_res = client.get("/api/visiting/?status=Completed&priority=Urgent")
     assert list_res.status_code == 200
     assert len(list_res.json()) >= 1

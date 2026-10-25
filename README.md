@@ -212,7 +212,7 @@ If your existing project uses **Node.js (Express, Nest, Next.js API routes), Go,
 1. `support_tickets`: Stores ticket code (`TCK-YYYYMMDD-XXXX`), system, category, urgency, priority, status, diagnostics (occurrence, root cause, checklist, assigned engineer), and customer rating.
 2. `ticket_messages`: Real-time chat messages linked to a ticket (`sender_name`, `sender_role`, `message`, `attachment_url`).
 3. `ticket_attachments`: Files and evidence photos attached to tickets.
-4. `visiting_reports`: Scheduled field visits (`VIS-YYYYMMDD-XXXX`), delegation lead engineer, phone, date, `visit_checklist` (company-visible), `super_admin_checklist` (internal dropdown-based), `show_visitor_count` toggle, audit flags (`is_flagged`, `flag_reason`, `flag_checklist_items`), and acknowledgement state.
+4. `visiting_reports`: Scheduled field visits (`VIS-YYYYMMDD-XXXX`), delegation lead engineer, phone, date, `visit_reasons` (company-visible), `internal_visit_reasons` (confidential), `show_visitor_count` toggle, the factory-side `host_name`/`host_phone` welcoming the team, audit flags (`is_flagged`, `flag_reason`, `prechecklist_audit`), and the completion verdict (`is_resolved`, `resolution_notes`).
 5. `support_employees`: Super Admin managed employee directory (`name`, `phone`, `designation`, `department`, lead-engineer flag, active flag).
 6. `support_checklist_options`: Dynamic dropdown options for the Super Admin internal checklist (`label`, `category`, `sort_order`, active flag).
 
@@ -245,8 +245,8 @@ All endpoints accept standard JSON and return structured responses:
 | `GET` | `/api/visiting/` | List visiting reports with role/company filtering (role-gated internal data) |
 | `POST` | `/api/visiting/` | Schedule a new visit (employee IDs, searchable visit + confidential reasons, headcount toggle) |
 | `PATCH` | `/api/visiting/{id}/` | Toggle headcount visibility / update the confidential reason (Super Admin) |
-| `POST` | `/api/visiting/{id}/acknowledge/` | Acknowledge visit (gate pass info, escort engineer) |
-| `POST` | `/api/visiting/{id}/complete/` | Complete visit with itemized resolution and optional audit flags |
+| `POST` | `/api/visiting/{id}/acknowledge/` | Acknowledge visit (gate pass info, welcoming person) |
+| `POST` | `/api/visiting/{id}/complete/` | Complete visit with the problem verdict (`is_resolved`) and pre-ticket check flags |
 
 ### ⚙️ Support Ticket Management API (`/api/support/`) — Super Admin only
 | Method | Endpoint | Description |
@@ -292,6 +292,8 @@ All endpoints accept standard JSON and return structured responses:
 | See internal dropdown checklist | ❌ Never | ✅ Yes |
 | See total visitor headcount | ✅ Only when toggled on | ✅ Always |
 | Flag company pre-visit checklist items | ❌ Hidden | ✅ Yes |
+| Confirm whether the visit solved the problem | ✅ Sees verdict | ✅ Sets verdict |
+| Name the factory-side welcoming person | ✅ Yes (on acknowledge) | ✅ Sees it |
 | Close Resolved Ticket | ✅ **Exclusive Authority** | ❌ Cannot close directly |
 | Schedule Visiting Engineer | ❌ No | ✅ Yes |
 | Acknowledge Visiting Delegation | ✅ Yes | ❌ No |

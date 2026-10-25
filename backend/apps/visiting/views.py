@@ -91,12 +91,16 @@ class VisitingReportAcknowledgeView(APIView):
             'Arafath'
         )
         notes = serializer.validated_data.get('company_acknowledgement_notes', '')
+        host_name = serializer.validated_data.get('host_name', '')
+        host_phone = serializer.validated_data.get('host_phone', '')
 
         updated_report = VisitingReportService.acknowledge_report(
             report=report,
             notes=notes,
             user_name=user_name,
             user_role=user_role,
+            host_name=host_name,
+            host_phone=host_phone,
         )
         return Response(
             VisitingReportSerializer(updated_report, context={'role': user_role}).data,
@@ -127,8 +131,40 @@ class VisitingReportCompleteView(APIView):
             prechecklist_audit=serializer.validated_data.get('prechecklist_audit', []),
             is_flagged=serializer.validated_data.get('is_flagged', False),
             flag_reason=serializer.validated_data.get('flag_reason', ''),
+            is_resolved=serializer.validated_data['is_resolved'],
+            resolution_notes=serializer.validated_data.get('resolution_notes', ''),
+            host_name=serializer.validated_data.get('host_name', ''),
+            host_phone=serializer.validated_data.get('host_phone', ''),
         )
         return Response(
             VisitingReportSerializer(completed_report, context={'role': user_role}).data,
             status=status.HTTP_200_OK
         )
+
+
+class VisitingReportClientConfirmView(APIView):
+    """
+    POST /api/visiting/<visit_id>/confirm-resolution
+    Company Admin signs off on whether the visit resolved the problem from the factory side.
+    """
+    def post(self, request, visit_id):
+        report = VisitingReportService.get_report(visit_id)
+        from .serializers import VisitingReportClientConfirmSerializer
+        serializer = VisitingReportClientConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_role = _request_role(request)
+        user_name = request.headers.get('x-user-name') or serializer.validated_data.get('client_resolved_by') or 'Company Admin'
+
+        updated_report = VisitingReportService.confirm_client_resolution(
+            report=report,
+            client_is_resolved=serializer.validated_data['client_is_resolved'],
+            client_resolution_notes=serializer.validated_data.get('client_resolution_notes', ''),
+            user_name=user_name,
+            user_role=user_role,
+        )
+        return Response(
+            VisitingReportSerializer(updated_report, context={'role': user_role}).data,
+            status=status.HTTP_200_OK
+        )
+

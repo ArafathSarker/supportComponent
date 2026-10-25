@@ -548,6 +548,8 @@ export class SupportApiClient {
     visiting_team_names?: string;
     visiting_team_members?: VisitingTeamMember[];
     total_visitors?: number;
+    host_name?: string;
+    host_phone?: string;
     visit_reasons?: import('./types').VisitReason[];
     internal_visit_reasons?: import('./types').VisitReason[];
     show_visitor_count?: boolean;
@@ -578,20 +580,27 @@ export class SupportApiClient {
 
   async acknowledgeVisit(
     visitId: string,
-    acknowledgedBy: string,
-    notes?: string,
-    userRole: string = 'company_admin'
+    payload: {
+      acknowledgedBy: string;
+      hostName: string;
+      hostPhone?: string;
+      notes?: string;
+      userRole?: string;
+    }
   ): Promise<VisitingReport> {
+    const userRole = payload.userRole || 'company_admin';
     const res = await fetch(`${this.apiBase}/visiting/${visitId}/acknowledge/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-user-role': userRole,
-        'x-user-name': acknowledgedBy,
+        'x-user-name': payload.acknowledgedBy,
       },
       body: JSON.stringify({
-        acknowledged_by: acknowledgedBy,
-        company_acknowledgement_notes: notes,
+        acknowledged_by: payload.acknowledgedBy,
+        company_acknowledgement_notes: payload.notes || '',
+        host_name: payload.hostName,
+        host_phone: payload.hostPhone || '',
       }),
     });
     if (!res.ok) {
@@ -603,33 +612,71 @@ export class SupportApiClient {
 
   async completeVisit(
     visitId: string,
-    serviceSummary: string = '',
-    completedBy?: string,
-    userRole: string = 'super_admin',
-    options?: {
+    payload: {
+      service_summary?: string;
+      completed_by?: string;
+      user_role?: string;
       prechecklist_audit?: import('./types').PrechecklistAuditItem[];
       is_flagged?: boolean;
       flag_reason?: string;
+      is_resolved: boolean;
+      resolution_notes?: string;
+      host_name?: string;
+      host_phone?: string;
     }
   ): Promise<VisitingReport> {
     const res = await fetch(`${this.apiBase}/visiting/${visitId}/complete/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-role': userRole,
-        'x-user-name': completedBy || 'Field Engineer',
+        'x-user-role': payload.user_role || 'super_admin',
+        'x-user-name': payload.completed_by || 'Field Engineer',
       },
       body: JSON.stringify({
-        service_summary: serviceSummary,
-        completed_by: completedBy,
-        prechecklist_audit: options?.prechecklist_audit || [],
-        is_flagged: options?.is_flagged || false,
-        flag_reason: options?.flag_reason || '',
+        service_summary: payload.service_summary || '',
+        completed_by: payload.completed_by,
+        prechecklist_audit: payload.prechecklist_audit || [],
+        is_flagged: payload.is_flagged || false,
+        flag_reason: payload.flag_reason || '',
+        is_resolved: payload.is_resolved,
+        resolution_notes: payload.resolution_notes || '',
+        host_name: payload.host_name || '',
+        host_phone: payload.host_phone || '',
       }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || err.error || 'Failed to complete visit');
+    }
+    return res.json();
+  }
+
+  async confirmClientResolution(
+    visitId: string,
+    payload: {
+      client_is_resolved: boolean;
+      client_resolution_notes?: string;
+      client_resolved_by?: string;
+      user_role?: string;
+    }
+  ): Promise<VisitingReport> {
+    const userRole = payload.user_role || 'company_admin';
+    const res = await fetch(`${this.apiBase}/visiting/${visitId}/confirm-resolution/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': userRole,
+        'x-user-name': payload.client_resolved_by || 'Company Admin',
+      },
+      body: JSON.stringify({
+        client_is_resolved: payload.client_is_resolved,
+        client_resolution_notes: payload.client_resolution_notes || '',
+        client_resolved_by: payload.client_resolved_by || '',
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.error || 'Failed to submit client resolution confirmation');
     }
     return res.json();
   }
@@ -640,6 +687,8 @@ export class SupportApiClient {
       show_visitor_count?: boolean;
       internal_visit_reasons?: import('./types').VisitReason[];
       super_admin_notes?: string;
+      host_name?: string;
+      host_phone?: string;
     },
     userRole: string = 'super_admin',
     userName?: string

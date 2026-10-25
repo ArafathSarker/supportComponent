@@ -50,6 +50,8 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
   const [priority, setPriority] = useState('High');
   const [floorLocation, setFloorLocation] = useState(GARMENTS_FLOORS[1]);
   const [lineNumber, setLineNumber] = useState('Sewing Line 04');
+  const [hostName, setHostName] = useState('');
+  const [hostPhone, setHostPhone] = useState('');
 
   // Managed employee directory
   const [employees, setEmployees] = useState<SupportEmployee[]>([]);
@@ -225,6 +227,8 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
         })),
         visiting_team_names: teamMembers.map((member) => member.name).join(', '),
         total_visitors: totalVisitorsCount,
+        host_name: hostName.trim(),
+        host_phone: hostPhone.trim(),
         visiting_engineers: [leadEngineer, ...teamMembers.map((member) => member.name)]
           .filter(Boolean)
           .join(', '),
@@ -262,11 +266,8 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                Dispatch Factory On-Site Engineer Visit
+                Schedule Factory Visit
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Pick engineers from the directory, set headcount visibility, and record why the visit is made
-              </p>
             </div>
           </div>
           <button
@@ -354,6 +355,28 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
           </div>
 
+          {/* Welcoming Person on Factory Side */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Welcoming Person</label>
+              <input
+                type="text"
+                value={hostName}
+                onChange={(e) => setHostName(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Welcoming Person Phone</label>
+              <input
+                type="tel"
+                value={hostPhone}
+                onChange={(e) => setHostPhone(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
+              />
+            </div>
+          </div>
+
           {/* Related Support Ticket */}
           <div className="space-y-1.5 bg-amber-50/50 border border-amber-100 rounded-xl p-3.5">
             <label className="text-xs font-semibold text-amber-950 flex items-center gap-1.5">
@@ -373,10 +396,6 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
                 </option>
               ))}
             </select>
-            <p className="text-[11px] text-slate-500">
-              Link this visit to a ticket so the company&apos;s pre-troubleshooting checklist can be
-              audited when the on-site team completes the visit.
-            </p>
 
             {selectedTicket && (
               <div className="bg-white border border-amber-200 rounded-lg p-2.5 space-y-1">
@@ -396,9 +415,6 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
                     </div>
                   ))
                 )}
-                <p className="text-[10px] text-slate-400 pt-0.5">
-                  Verify these on-site. Items found not done can be flagged during completion.
-                </p>
               </div>
             )}
           </div>
@@ -407,7 +423,7 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
           <div className="space-y-1.5 bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5">
             <label className="text-xs font-semibold text-indigo-950 flex items-center gap-1.5">
               <Calendar size={14} className="text-indigo-600" />
-              <span>Scheduled Visit Date (Calendar)</span>
+              <span>Scheduled Date</span>
               <span className="text-red-500">*</span>
             </label>
             <input
@@ -417,9 +433,6 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               className="w-full sm:w-64 bg-white border border-slate-300 text-slate-900 rounded-lg px-3.5 py-2 text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-sm cursor-pointer"
               required
             />
-            <p className="text-[11px] text-slate-500 mt-1">
-              Select the exact calendar date the engineering delegation will arrive on-site.
-            </p>
           </div>
 
           {/* Lead Engineer & Team Delegation Box */}
@@ -437,15 +450,12 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             {directoryLoading ? (
               <div className="flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg p-3">
                 <Loader2 size={14} className="animate-spin text-indigo-600" />
-                <span>Loading support employee directory...</span>
+                <span>Loading employee directory...</span>
               </div>
             ) : employees.length === 0 ? (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-start gap-2">
                 <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  No support employees found. Add employees in <strong>Support Ticket Management</strong>{' '}
-                  to search and select visiting engineers.
-                </span>
+                <span>No support employees found in directory.</span>
               </div>
             ) : null}
 
@@ -454,14 +464,13 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
                   <UserCheck size={12} className="text-slate-500" />
-                  <span>Main / Lead Visiting Engineer</span>
+                  <span>Lead Visiting Engineer</span>
                   <span className="text-red-500">*</span>
                 </label>
                 <EmployeeSearchSelect
                   employees={employees.filter((employee) => employee.is_lead_engineer !== false)}
                   value={leadEmployeeId || null}
                   onChange={(employeeId) => setLeadEmployeeId(employeeId)}
-                  placeholder="Search main engineer..."
                   disabled={directoryLoading || employees.length === 0}
                   required
                 />
@@ -470,19 +479,14 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
                   <Phone size={12} className="text-slate-500" />
-                  <span>Main Engineer Phone (auto-filled)</span>
+                  <span>Lead Engineer Phone</span>
                 </label>
                 <input
                   type="text"
                   value={leadEngineerPhone}
                   readOnly
-                  placeholder="Select the main engineer to auto-fill"
                   className="w-full bg-slate-100 border border-slate-300 text-slate-700 rounded-lg px-3 py-2 text-xs cursor-not-allowed"
                 />
-                <p className="text-[10px] text-slate-500 flex items-center gap-1">
-                  <Lock size={10} />
-                  This is the number shown to the company owner.
-                </p>
               </div>
             </div>
 
@@ -491,7 +495,7 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               <label className="text-[11px] font-semibold text-slate-700 flex items-center justify-between">
                 <span>Accompanying Visiting Employees</span>
                 <span className="text-[10px] text-slate-400">
-                  {teamMembers.length} selected • company sees names only
+                  {teamMembers.length} selected
                 </span>
               </label>
               <EmployeeMultiPicker
@@ -501,27 +505,16 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
                 onRemove={handleRemoveTeamMember}
                 disabled={directoryLoading || employees.length === 0}
               />
-              <p className="text-[11px] text-slate-500">
-                Search and add every employee who will visit the factory. Only the main engineer's
-                phone number is displayed to the company owner.
-              </p>
             </div>
 
             {/* Headcount visibility toggle */}
             <div className="bg-white border border-slate-200 rounded-lg p-3 flex items-start justify-between gap-3 shadow-xs">
-              <div className="flex items-start gap-2">
+              <div className="flex items-center gap-2">
                 <span className={`mt-0.5 ${showVisitorCount ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {showVisitorCount ? <Eye size={16} /> : <EyeOff size={16} />}
                 </span>
-                <div>
-                  <div className="text-[11px] font-semibold text-slate-800">
-                    Show total headcount to company owner
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    {showVisitorCount
-                      ? `The company owner will see "Total: ${totalVisitorsCount} ${totalVisitorsCount === 1 ? 'Person' : 'Persons'}" on their acknowledgement screen.`
-                      : 'Hidden from the company owner. Only the main engineer name and phone are shown.'}
-                  </p>
+                <div className="text-[11px] font-semibold text-slate-800">
+                  Show total headcount to company owner
                 </div>
               </div>
               <button
@@ -529,7 +522,6 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
                 role="switch"
                 aria-checked={showVisitorCount}
                 onClick={() => setShowVisitorCount((prev) => !prev)}
-                title="Toggle total headcount visibility for the company owner"
                 className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                   showVisitorCount ? 'bg-emerald-600' : 'bg-slate-300'
                 }`}
@@ -543,12 +535,12 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
           </div>
 
-          {/* Reason for Visit (visible to the company owner) */}
+          {/* Reason for Visit */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
                 <ListTodo size={15} className="text-indigo-600" />
-                <span>Reason for Visit (visible to client)</span>
+                <span>Reason for Visit</span>
                 <span className="text-red-500">*</span>
               </label>
               <span className="text-xs text-indigo-700 font-semibold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
@@ -556,22 +548,16 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               </span>
             </div>
 
-            <p className="text-[11px] text-slate-500">
-              Why the engineering team is visiting the factory. These reasons are shown to the
-              factory owner; the options are maintained in Support Ticket Management.
-            </p>
-
             <ReasonSearchSelect
               options={visitReasonOptions}
               selectedIds={visitReasons.map((reason) => reason.option_id || '')}
               onSelect={handleAddReason}
-              placeholder="Search a visit reason (e.g. maintenance, network, training)..."
             />
 
             <div className="space-y-1.5 max-h-48 overflow-y-auto pt-1">
               {visitReasons.length === 0 ? (
                 <div className="p-3 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-300">
-                  No reason selected yet. Search above and pick a reason to add it.
+                  No reasons selected.
                 </div>
               ) : (
                 visitReasons.map((reason, index) => (
@@ -599,36 +585,26 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
           </div>
 
-          {/* Confidential Reason for Visit (provider only) */}
+          {/* Confidential Reason for Visit */}
           <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-xs font-bold text-purple-950 flex items-center gap-1.5 uppercase tracking-wide">
                 <ShieldAlert size={15} className="text-purple-600" />
                 <span>Confidential Reason for Visit</span>
               </label>
-              <span className="text-[10px] font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1">
-                <Lock size={10} />
-                Super Admin only
-              </span>
             </div>
-
-            <p className="text-[11px] text-purple-800/80">
-              The real reason this visit is being made. Options come from Support Ticket Management
-              and are never shown to the company owner.
-            </p>
 
             <ReasonSearchSelect
               options={internalReasonOptions}
               selectedIds={internalReasons.map((reason) => reason.option_id || '')}
               onSelect={handleAddInternalReason}
-              placeholder="Search a confidential reason..."
               confidential
             />
 
             <div className="space-y-1.5 max-h-44 overflow-y-auto">
               {internalReasons.length === 0 ? (
                 <div className="p-3 text-center text-[11px] text-purple-700/60 bg-white rounded-lg border border-dashed border-purple-200">
-                  No confidential reason added yet. Search above and pick a reason to add it.
+                  No confidential reasons selected.
                 </div>
               ) : (
                 internalReasons.map((reason, index) => (
@@ -656,12 +632,11 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
             </div>
           </div>
 
-          {/* Super Admin Internal Remarks */}
+          {/* Remarks */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700">Special Tools & Safety Notes</label>
             <textarea
               rows={2}
-              placeholder="e.g. Delegation brings calibrated lux meter, spare needle sensor boards, and ESD safety kit..."
               value={superAdminNotes}
               onChange={(e) => setSuperAdminNotes(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
@@ -670,13 +645,7 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
         </form>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
-          <span className="text-[11px] text-slate-500 hidden sm:flex items-center gap-1">
-            <Phone size={12} className="text-emerald-600" />
-            {selectedLead
-              ? `${leadEngineer} • ${leadEngineerPhone}`
-              : 'Select the main engineer'}
-          </span>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -695,10 +664,10 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               {submitting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  <span>Scheduling Dispatch...</span>
+                  <span>Scheduling...</span>
                 </>
               ) : (
-                <span>Dispatch Visit ({totalVisitorsCount} Persons)</span>
+                <span>Schedule Visit</span>
               )}
             </button>
           </div>

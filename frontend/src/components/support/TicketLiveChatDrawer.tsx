@@ -8,7 +8,6 @@ import {
   RotateCcw, 
   Clock, 
   Download, 
-  ShieldAlert,
   Star,
   MessageSquare,
   Info,
@@ -526,7 +525,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                     type="text"
                     value={workspaceEngineer}
                     onChange={(e) => setWorkspaceEngineer(e.target.value)}
-                    placeholder="Engineer name"
                     className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs"
                   />
                 </div>
@@ -540,7 +538,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                     type="text"
                     value={workspaceOccurrence}
                     onChange={(e) => setWorkspaceOccurrence(e.target.value)}
-                    placeholder="First time, Intermittent, Recurring daily"
                     className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs"
                   />
                 </div>
@@ -554,7 +551,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                     type="text"
                     value={workspacePossibility}
                     onChange={(e) => setWorkspacePossibility(e.target.value)}
-                    placeholder="Low, Medium, High"
                     className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs"
                   />
                 </div>
@@ -568,7 +564,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                     rows={3}
                     value={workspaceRootCause}
                     onChange={(e) => setWorkspaceRootCause(e.target.value)}
-                    placeholder="Root cause analysis / diagnostic findings..."
                     className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs resize-y"
                   />
                 </div>
@@ -582,7 +577,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                     rows={3}
                     value={workspaceSupportNote}
                     onChange={(e) => setWorkspaceSupportNote(e.target.value)}
-                    placeholder="Internal notes for the support team..."
                     className="w-full bg-white border border-slate-300 text-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs resize-y"
                   />
                 </div>
@@ -838,9 +832,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                           <span>Reopen Ticket</span>
                         </button>
                       )}
-                      <p className="text-[11px] text-slate-500 leading-tight">
-                        * Company Owner Rule: Only you can formally verify resolution and close this ticket.
-                      </p>
                     </div>
                   )}
 
@@ -863,13 +854,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
                             Closed (Consumer/Owner Only)
                           </option>
                         </select>
-                      </div>
-
-                      <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 flex items-start gap-2">
-                        <ShieldAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
-                        <span>
-                          Super Admin can set progress, but final ticket closure is reserved for the factory owner.
-                        </span>
                       </div>
                     </div>
                   )}
@@ -1067,7 +1051,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
 
               <textarea
                 rows={1}
-                placeholder={pendingFile ? "Add an optional message and click Send..." : "Type your message..."}
                 value={inputText}
                 onChange={(e) => {
                   setInputText(e.target.value);
@@ -1132,7 +1115,6 @@ export const TicketLiveChatDrawer: React.FC<TicketLiveChatDrawerProps> = ({
               <label className="text-xs font-semibold text-slate-700">Closing Remarks (Optional):</label>
               <textarea
                 rows={2}
-                placeholder="Remarks on resolution..."
                 value={closeNotes}
                 onChange={(e) => setCloseNotes(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-xs focus:bg-white focus:outline-none focus:border-blue-500 shadow-sm"

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Search, Plus, CheckCircle2, ListFilter, Lock } from 'lucide-react';
+import { Search, Plus, ListFilter, Lock } from 'lucide-react';
 import type { ChecklistOption } from './types';
 
 const matchesReason = (option: ChecklistOption, query: string) => {
@@ -15,7 +15,6 @@ interface ReasonSearchSelectProps {
   options: ChecklistOption[];
   selectedIds?: string[];
   onSelect: (option: ChecklistOption) => void;
-  placeholder?: string;
   emptyHint?: string;
   noMatchHint?: string;
   disabled?: boolean;
@@ -31,9 +30,8 @@ export const ReasonSearchSelect: React.FC<ReasonSearchSelectProps> = ({
   options,
   selectedIds = [],
   onSelect,
-  placeholder = 'Search reasons...',
-  emptyHint = 'No reasons yet. Add them in Support Ticket Management.',
-  noMatchHint = 'No matching reason. Try another keyword or add it in Support Ticket Management.',
+  emptyHint = 'No reasons available',
+  noMatchHint = 'No matching reason',
   disabled = false,
   confidential = false,
 }) => {
@@ -72,7 +70,6 @@ export const ReasonSearchSelect: React.FC<ReasonSearchSelectProps> = ({
               }
             }}
             onBlur={() => window.setTimeout(() => setOpen(false), 150)}
-            placeholder={disabled ? 'No managed reasons available' : placeholder}
             disabled={disabled}
             className={`w-full bg-white border border-slate-300 text-slate-900 rounded-lg pl-8 pr-8 py-2 text-xs focus:outline-none shadow-sm disabled:bg-slate-100 disabled:text-slate-400 ${
               confidential ? 'focus:border-purple-500' : 'focus:border-indigo-500'
@@ -113,11 +110,6 @@ export const ReasonSearchSelect: React.FC<ReasonSearchSelectProps> = ({
           </div>
         )}
       </div>
-
-      <p className="text-[10px] text-slate-400 flex items-center gap-1">
-        <CheckCircle2 size={10} className="text-emerald-600" />
-        {options.length} managed reason{options.length === 1 ? '' : 's'} available • type to search, press Enter to add
-      </p>
     </div>
   );
 };

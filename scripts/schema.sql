@@ -110,6 +110,8 @@ CREATE TABLE IF NOT EXISTS visiting_reports (
     visit_checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
     super_admin_checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
     show_visitor_count BOOLEAN NOT NULL DEFAULT TRUE,
+    host_name VARCHAR(150) NOT NULL DEFAULT '',
+    host_phone VARCHAR(50) NOT NULL DEFAULT '',
     is_flagged BOOLEAN NOT NULL DEFAULT FALSE,
     flag_reason TEXT NOT NULL DEFAULT '',
     flag_checklist_items JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -126,6 +128,12 @@ CREATE TABLE IF NOT EXISTS visiting_reports (
     acknowledged_by VARCHAR(100) NULL,
     completed_at TIMESTAMPTZ NULL,
     service_summary TEXT NULL,
+    is_resolved BOOLEAN NULL,
+    resolution_notes TEXT NOT NULL DEFAULT '',
+    client_is_resolved BOOLEAN NULL,
+    client_resolution_notes TEXT NOT NULL DEFAULT '',
+    client_resolved_at TIMESTAMPTZ NULL,
+    client_resolved_by VARCHAR(100) NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -194,6 +202,8 @@ ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS total_visitors INTEGER NOT
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS visit_checklist JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS super_admin_checklist JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS show_visitor_count BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS host_name VARCHAR(150) NOT NULL DEFAULT '';
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS host_phone VARCHAR(50) NOT NULL DEFAULT '';
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS is_flagged BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS flag_reason TEXT NOT NULL DEFAULT '';
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS flag_checklist_items JSONB NOT NULL DEFAULT '[]'::jsonb;
@@ -210,6 +220,12 @@ ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPT
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS acknowledged_by VARCHAR(100) NULL;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ NULL;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS service_summary TEXT NULL;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS is_resolved BOOLEAN NULL;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS resolution_notes TEXT NOT NULL DEFAULT '';
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS client_is_resolved BOOLEAN NULL;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS client_resolution_notes TEXT NOT NULL DEFAULT '';
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS client_resolved_at TIMESTAMPTZ NULL;
+ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS client_resolved_by VARCHAR(100) NULL;
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 ALTER TABLE visiting_reports ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 

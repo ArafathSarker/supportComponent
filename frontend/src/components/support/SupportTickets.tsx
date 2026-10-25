@@ -256,10 +256,9 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
               <Search size={15} className="absolute left-3 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="search machine, line, keyword..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-white border border-slate-300 text-slate-800 pl-9 pr-8 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors shadow-xs placeholder-slate-400"
+                className="bg-white border border-slate-300 text-slate-800 pl-9 pr-8 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors shadow-xs"
               />
               {search && (
                 <button

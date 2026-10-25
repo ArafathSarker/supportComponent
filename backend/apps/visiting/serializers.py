@@ -92,6 +92,8 @@ class VisitingReportSerializer(serializers.ModelSerializer):
             'visit_reasons',
             'internal_visit_reasons',
             'show_visitor_count',
+            'host_name',
+            'host_phone',
             'prechecklist_audit',
             'is_flagged',
             'flag_reason',
@@ -108,6 +110,12 @@ class VisitingReportSerializer(serializers.ModelSerializer):
             'acknowledged_by',
             'completed_at',
             'service_summary',
+            'is_resolved',
+            'resolution_notes',
+            'client_is_resolved',
+            'client_resolution_notes',
+            'client_resolved_at',
+            'client_resolved_by',
             'created_at',
             'updated_at',
         ]
@@ -153,6 +161,8 @@ class VisitingReportCreateSerializer(serializers.Serializer):
         child=serializers.DictField(), required=False, default=list
     )
     total_visitors = serializers.IntegerField(required=False, default=1)
+    host_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    host_phone = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
     visit_reasons = serializers.ListField(child=serializers.DictField(), required=False, default=list)
     internal_visit_reasons = serializers.ListField(
         child=serializers.DictField(), required=False, default=list
@@ -174,17 +184,22 @@ class VisitingReportCreateSerializer(serializers.Serializer):
 class VisitingReportAcknowledgeSerializer(serializers.Serializer):
     """
     Validation schema for acknowledging a scheduled report (Company Admin).
+
+    The company names the person who will welcome the visiting team on site.
     """
     company_acknowledgement_notes = serializers.CharField(required=False, allow_blank=True, default="")
-    acknowledged_by = serializers.CharField(max_length=100, default="Arafath", required=False)
+    acknowledged_by = serializers.CharField(max_length=100, default="", required=False, allow_blank=True)
+    host_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    host_phone = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
 
 
 class VisitingReportCompleteSerializer(serializers.Serializer):
     """
     Validation schema for completing a field visit report (Solution Provider).
 
-    The audit records, per pre-ticket check claimed by the company, whether the
-    on-site team could acknowledge it or had to flag it.
+    Flags only: a pre-ticket check is either flagged (claimed by the company but
+    not actually done) or left clean. `is_resolved` records the final verdict on
+    whether the visit solved the reported problem.
     """
     service_summary = serializers.CharField(required=False, allow_blank=True, default="")
     prechecklist_audit = serializers.ListField(
@@ -192,6 +207,19 @@ class VisitingReportCompleteSerializer(serializers.Serializer):
     )
     is_flagged = serializers.BooleanField(required=False, default=False)
     flag_reason = serializers.CharField(required=False, allow_blank=True, default="")
+    is_resolved = serializers.BooleanField()
+    resolution_notes = serializers.CharField(required=False, allow_blank=True, default="")
+    host_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    host_phone = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+
+
+class VisitingReportClientConfirmSerializer(serializers.Serializer):
+    """
+    Validation schema for company admin confirmation of resolution.
+    """
+    client_is_resolved = serializers.BooleanField()
+    client_resolution_notes = serializers.CharField(required=False, allow_blank=True, default="")
+    client_resolved_by = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
 
 
 class VisitingReportUpdateSerializer(serializers.Serializer):
@@ -203,3 +231,5 @@ class VisitingReportUpdateSerializer(serializers.Serializer):
         child=serializers.DictField(), required=False
     )
     super_admin_notes = serializers.CharField(required=False, allow_blank=True)
+    host_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    host_phone = serializers.CharField(max_length=50, required=False, allow_blank=True)

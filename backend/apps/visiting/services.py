@@ -183,6 +183,8 @@ class VisitingReportService:
             visiting_team_names=team_names or data.get('visiting_team_names', ''),
             visiting_team_members=team_members,
             total_visitors=total_visitors,
+            host_name=(data.get('host_name') or '').strip(),
+            host_phone=(data.get('host_phone') or '').strip(),
             visit_reasons=visit_reasons,
             internal_visit_reasons=internal_visit_reasons,
             show_visitor_count=data.get('show_visitor_count', True),
@@ -218,6 +220,8 @@ class VisitingReportService:
         notes: str,
         user_name: str,
         user_role: str,
+        host_name: str = '',
+        host_phone: str = '',
     ) -> VisitingReport:
         if user_role == 'super_admin':
             raise PermissionDenied("Only Company Owner/Admin can acknowledge visiting reports.")
@@ -226,6 +230,8 @@ class VisitingReportService:
         report.company_acknowledgement_notes = notes
         report.acknowledged_at = timezone.now()
         report.acknowledged_by = user_name or "Company Admin"
+        report.host_name = (host_name or '').strip()
+        report.host_phone = (host_phone or '').strip()
         report.save()
 
         if report.ticket:
@@ -247,9 +253,9 @@ class VisitingReportService:
         """
         Normalize the audit of the problem-category pre-ticket checks.
 
-        Each item is `{id, task, status, note}` where status is one of
-        `acknowledged` (the company really did it) or `flagged` (it was claimed
-        but the on-site team found it was not done).
+        Each item is `{id, task, status, note}` where status is `flagged` (the
+        company claimed the check was done but the on-site team found it was not)
+        or `unverified` for every check left clean.
         """
         normalized = []
         for index, item in enumerate(raw_audit or []):
@@ -258,9 +264,7 @@ class VisitingReportService:
             task = (item.get('task') or item.get('label') or '').strip()
             if not task:
                 continue
-            status = item.get('status')
-            if status not in ('acknowledged', 'flagged'):
-                status = 'acknowledged' if item.get('checked') else 'unverified'
+            status = 'flagged' if item.get('status') == 'flagged' else 'unverified'
             normalized.append({
                 'id': item.get('id') or f'pre-{index + 1}',
                 'task': task,
@@ -278,6 +282,10 @@ class VisitingReportService:
         prechecklist_audit: list = None,
         is_flagged: bool = False,
         flag_reason: str = '',
+        is_resolved: bool = False,
+        resolution_notes: str = '',
+        host_name: str = '',
+        host_phone: str = '',
     ) -> VisitingReport:
         if user_role == 'company_admin':
             raise PermissionDenied("Only Solution Provider engineers (super_admin) can mark visiting reports completed.")
@@ -289,12 +297,7 @@ class VisitingReportService:
         if service_summary:
             report.service_summary = service_summary
         elif not report.service_summary:
-            flagged_count = sum(1 for item in audit if item['status'] == 'flagged')
-            report.service_summary = (
-                f"{flagged_count} pre-ticket check(s) were flagged during the on-site audit."
-                if flagged_count
-                else "On-site visit completed."
-            )
+            report.service_summary = "On-site visit completed."
 
         # Audit flag: the company claimed a pre-ticket check was handled, but the
         # on-site team found it was not. Visible to super admins only.
@@ -304,16 +307,25 @@ class VisitingReportService:
         report.flagged_at = timezone.now() if report.is_flagged else None
         report.flagged_by = (user_name or 'Field Engineer') if report.is_flagged else ''
 
+        # Final verdict on the reported problem, shared with both sides.
+        report.is_resolved = bool(is_resolved)
+        report.resolution_notes = (resolution_notes or '').strip()
+        if host_name:
+            report.host_name = host_name.strip()
+        if host_phone:
+            report.host_phone = host_phone.strip()
+
         report.completed_at = timezone.now()
         report.save()
 
         if report.ticket:
             from apps.chat.services import ChatService
+            verdict = 'the problem was solved' if report.is_resolved else 'the problem is not solved'
             ChatService.create_message(
                 ticket=report.ticket,
                 sender_name="System",
                 sender_role="system",
-                message=f"Visiting Report {report.visit_code} marked COMPLETED. Summary: {service_summary}",
+                message=f"Visiting Report {report.visit_code} marked COMPLETED: {verdict}.",
                 is_system_event=True
             )
 
@@ -323,8 +335,38 @@ class VisitingReportService:
         return report
 
     @staticmethod
+    def confirm_client_resolution(
+        report: VisitingReport,
+        client_is_resolved: bool,
+        client_resolution_notes: str,
+        user_name: str,
+        user_role: str,
+    ) -> VisitingReport:
+        """Company admin signs off on whether the visit solved the problem from their side."""
+        report.client_is_resolved = bool(client_is_resolved)
+        report.client_resolution_notes = (client_resolution_notes or '').strip()
+        report.client_resolved_at = timezone.now()
+        report.client_resolved_by = user_name or 'Company Admin'
+        report.save()
+
+        if report.ticket:
+            from apps.chat.services import ChatService
+            verdict = 'client confirmed the problem is solved' if report.client_is_resolved else 'client reported the problem is still not solved'
+            ChatService.create_message(
+                ticket=report.ticket,
+                sender_name=user_name or "Company Admin",
+                sender_role="company_admin",
+                message=f"Visiting Report {report.visit_code}: {verdict}.",
+                is_system_event=True
+            )
+
+        serialized = VisitingReportSerializer(report, context={'role': 'company_admin'}).data
+        broadcast_global_event('visiting_report_client_confirmed', serialized)
+        return report
+
+    @staticmethod
     def update_report(report: VisitingReport, data: dict, user_role: str) -> VisitingReport:
-        """Super admin maintenance of a scheduled visit (headcount visibility, confidential reason)."""
+        """Super admin maintenance of a scheduled visit (headcount visibility, confidential reason, host)."""
         if user_role == 'company_admin':
             raise PermissionDenied("Only Solution Provider engineers (super_admin) can update visiting reports.")
 
@@ -334,6 +376,10 @@ class VisitingReportService:
             report.internal_visit_reasons = _normalize_reasons(data['internal_visit_reasons'])
         if 'super_admin_notes' in data:
             report.super_admin_notes = data['super_admin_notes']
+        if 'host_name' in data:
+            report.host_name = (data['host_name'] or '').strip()
+        if 'host_phone' in data:
+            report.host_phone = (data['host_phone'] or '').strip()
 
         report.save()
 

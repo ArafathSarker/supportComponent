@@ -17,7 +17,6 @@ interface EmployeeSearchSelectProps {
   employees: SupportEmployee[];
   value: string | null;
   onChange: (employeeId: string, employee: SupportEmployee | null) => void;
-  placeholder?: string;
   disabled?: boolean;
   required?: boolean;
 }
@@ -30,7 +29,6 @@ export const EmployeeSearchSelect: React.FC<EmployeeSearchSelectProps> = ({
   employees,
   value,
   onChange,
-  placeholder = 'Search employee by name or phone...',
   disabled = false,
   required = false,
 }) => {
@@ -62,7 +60,6 @@ export const EmployeeSearchSelect: React.FC<EmployeeSearchSelectProps> = ({
             if (e.key === 'Enter') e.preventDefault();
           }}
           onBlur={() => window.setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder}
           disabled={disabled}
           required={required && !selected}
           className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg pl-8 pr-8 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm disabled:bg-slate-100 disabled:text-slate-400"
@@ -86,7 +83,7 @@ export const EmployeeSearchSelect: React.FC<EmployeeSearchSelectProps> = ({
         <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-3 py-2.5 text-[11px] text-slate-400">
-              No matching employee. Add employees in Support Ticket Management.
+              No matching employee
             </div>
           ) : (
             filtered.map((employee) => (
@@ -129,7 +126,7 @@ export const EmployeeSearchSelect: React.FC<EmployeeSearchSelectProps> = ({
         <p className="mt-1 text-[11px] text-emerald-700 flex items-center gap-1">
           <Phone size={11} />
           <span>
-            Auto-filled contact: <strong>{selected.phone}</strong>
+            <strong>{selected.phone}</strong>
             {selected.designation ? ` • ${selected.designation}` : ''}
           </span>
         </p>
@@ -205,7 +202,6 @@ export const EmployeeMultiPicker: React.FC<EmployeeMultiPickerProps> = ({
               if (e.key === 'Enter') e.preventDefault();
             }}
             onBlur={() => window.setTimeout(() => setOpen(false), 150)}
-            placeholder="Search employees to add to the visiting team..."
             disabled={disabled}
             className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm disabled:bg-slate-100 disabled:text-slate-400"
           />
@@ -216,7 +212,7 @@ export const EmployeeMultiPicker: React.FC<EmployeeMultiPickerProps> = ({
             {filtered.length === 0 ? (
               <div className="px-3 py-2.5 text-[11px] text-slate-400">
                 {employees.length === 0
-                  ? 'No employees yet. Add them in Support Ticket Management.'
+                  ? 'No employees available'
                   : 'No matching employee available.'}
               </div>
             ) : (

@@ -40,6 +40,9 @@ class VisitingReport(models.Model):
     internal_visit_reasons = models.JSONField(default=list, blank=True)
     # Super admin toggle: reveal the total headcount to the company owner.
     show_visitor_count = models.BooleanField(default=True)
+    # The person on the factory side who welcomes and hosts the visiting team.
+    host_name = models.CharField(max_length=150, blank=True, default="")
+    host_phone = models.CharField(max_length=50, blank=True, default="")
     # Audit of the problem-category pre-ticket checks the company claimed to have
     # done before raising the linked ticket: [{task, status, note}].
     prechecklist_audit = models.JSONField(default=list, blank=True)
@@ -63,6 +66,14 @@ class VisitingReport(models.Model):
     acknowledged_by = models.CharField(max_length=100, null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     service_summary = models.TextField(blank=True, null=True)
+    # Final confirmation: did the visit actually solve the reported problem?
+    is_resolved = models.BooleanField(null=True, blank=True)
+    resolution_notes = models.TextField(blank=True, default="")
+    # Client-side confirmation on whether the issue was resolved
+    client_is_resolved = models.BooleanField(null=True, blank=True)
+    client_resolution_notes = models.TextField(blank=True, default="")
+    client_resolved_at = models.DateTimeField(null=True, blank=True)
+    client_resolved_by = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -165,14 +165,9 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
             <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-sm">
               <Edit3 size={18} />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                Edit Ticket Details: <span className="font-mono text-blue-600">{ticket.ticket_code}</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Authorized for Company Owner ({currentUser.company_name})
-              </p>
-            </div>
+            <h3 className="text-base font-bold text-slate-900 tracking-tight">
+              Edit Ticket Details: <span className="font-mono text-blue-600">{ticket.ticket_code}</span>
+            </h3>
           </div>
           <button
             type="button"
@@ -255,14 +250,10 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
               </span>
             </div>
 
-            <p className="text-[11px] text-slate-500">
-              Check all steps verified on the factory floor:
-            </p>
-
             <div className="space-y-1.5 pt-1">
               {preChecklist.length === 0 && (
                 <div className="p-3 text-center text-[11px] text-slate-500 bg-white rounded-lg border border-dashed border-slate-300">
-                  This problem category has no managed pre-ticket checks yet.
+                  No pre-ticket checks for this category.
                 </div>
               )}
               {preChecklist.map((item, idx) => {
@@ -341,7 +332,6 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
               <label className="text-xs font-semibold text-slate-700">Line Number</label>
               <input
                 type="text"
-                placeholder="e.g. Line 04"
                 value={lineNumber}
                 onChange={(e) => setLineNumber(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 shadow-sm"

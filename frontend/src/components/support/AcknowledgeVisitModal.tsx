@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  X, 
-  ShieldCheck, 
-  Loader2, 
-  Phone, 
-  User, 
-  Users, 
-  Calendar, 
-  CheckCircle2, 
-  MapPin, 
+import {
+  X,
+  ShieldCheck,
+  Loader2,
+  Phone,
+  User,
+  Users,
+  Calendar,
+  CheckCircle2,
   ListTodo,
-  AlertTriangle,
-  Building2
+  AlertTriangle
 } from 'lucide-react';
 import type { VisitingReport, CurrentUser } from './types';
 import { api } from './api';
@@ -31,15 +29,17 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
   currentUser,
   onVisitAcknowledged
 }) => {
-  const [acknowledgedBy, setAcknowledgedBy] = useState(currentUser.name || 'Arafath');
-  const [notes, setNotes] = useState('Gate pass registered at Factory Main Gate. Factory floor escort arranged.');
+  const [acknowledgedBy, setAcknowledgedBy] = useState(currentUser.name || '');
+  const [hostName, setHostName] = useState('');
+  const [hostPhone, setHostPhone] = useState('');
+  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen || !visit) return null;
 
   const leadName = visit.lead_engineer || visit.visiting_engineers;
-  const leadPhone = visit.lead_engineer_phone || '+880 1712-345678';
+  const leadPhone = visit.lead_engineer_phone;
   const showHeadcount =
     visit.show_visitor_count !== false && typeof visit.total_visitors === 'number';
   const totalPersons = visit.total_visitors || 1;
@@ -50,16 +50,21 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hostName.trim()) {
+      setError('Add the welcoming person on the factory side.');
+      return;
+    }
     try {
       setSubmitting(true);
       setError(null);
 
-      const updated = await api.acknowledgeVisit(
-        visit.id,
-        acknowledgedBy,
+      const updated = await api.acknowledgeVisit(visit.id, {
+        acknowledgedBy: acknowledgedBy.trim() || currentUser.name,
+        hostName: hostName.trim(),
+        hostPhone: hostPhone.trim(),
         notes,
-        currentUser.role || 'company_admin'
-      );
+        userRole: currentUser.role || 'company_admin',
+      });
       onVisitAcknowledged(updated);
       onClose();
     } catch (err: any) {
@@ -71,7 +76,7 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-      <div 
+      <div
         className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -81,14 +86,9 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
             <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
               <ShieldCheck size={20} />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                Review & Acknowledge Factory Visit
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Verify the delegation, direct contact, and the reason for the visit
-              </p>
-            </div>
+            <h3 className="text-base font-bold text-slate-900 tracking-tight">
+              Acknowledge Factory Visit
+            </h3>
           </div>
           <button
             type="button"
@@ -107,7 +107,7 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
             </div>
           )}
 
-          {/* Primary Visiting Delegation Details Banner */}
+          {/* Visiting delegation */}
           <div className="bg-gradient-to-br from-indigo-50/80 via-blue-50/50 to-slate-50 border border-indigo-100 rounded-xl p-4 space-y-3 shadow-xs">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
@@ -118,20 +118,16 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                   {visit.target_system}
                 </span>
               </div>
-              {showHeadcount ? (
+              {showHeadcount && (
                 <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-800 bg-indigo-100/80 px-2.5 py-1 rounded-full border border-indigo-200">
                   <Users size={13} />
-                  <span>Total: {totalPersons} {totalPersons === 1 ? 'Person Visiting' : 'Persons Visiting'}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-white/70 px-2.5 py-1 rounded-full border border-slate-200">
-                  <Users size={12} />
-                  <span>Headcount not shared</span>
+                  <span>
+                    Total: {totalPersons} {totalPersons === 1 ? 'Person Visiting' : 'Persons Visiting'}
+                  </span>
                 </div>
               )}
             </div>
 
-            {/* Team Leader & Direct Phone Contact Card */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1 shadow-xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -147,18 +143,20 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                   Leader Contact Phone
                 </span>
-                <a
-                  href={`tel:${leadPhone}`}
-                  className="flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
-                  title="Click to call visiting lead engineer"
-                >
-                  <Phone size={14} className="text-emerald-600 shrink-0" />
-                  <span>{leadPhone}</span>
-                </a>
+                {leadPhone ? (
+                  <a
+                    href={`tel:${leadPhone}`}
+                    className="flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+                  >
+                    <Phone size={14} className="text-emerald-600 shrink-0" />
+                    <span>{leadPhone}</span>
+                  </a>
+                ) : (
+                  <span className="text-xs font-semibold text-slate-400">—</span>
+                )}
               </div>
             </div>
 
-            {/* Accompanying Names & Calendar Scheduled Date */}
             <div className="text-xs text-slate-600 space-y-1.5 pt-1 border-t border-indigo-100/80">
               {teamNames && (
                 <div>
@@ -171,13 +169,15 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                   <span>Arrival Date: <strong>{visit.scheduled_date}</strong></span>
                 </span>
                 {visit.floor_location && (
-                  <span className="text-slate-400">• Location: {visit.floor_location} ({visit.line_number || 'All Lines'})</span>
+                  <span className="text-slate-400">
+                    • Location: {visit.floor_location} ({visit.line_number || 'All Lines'})
+                  </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Reason the engineers are visiting the factory */}
+          {/* Reason for the visit */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
@@ -185,20 +185,17 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                 <span>Reason for this Visit</span>
               </label>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                {visitReasons.length > 0 ? `${visitReasons.length} Reason${visitReasons.length !== 1 ? 's' : ''}` : 'Standard Inspection'}
+                {visitReasons.length > 0
+                  ? `${visitReasons.length} Reason${visitReasons.length !== 1 ? 's' : ''}`
+                  : 'Standard Inspection'}
               </span>
             </div>
-
-            <p className="text-[11px] text-slate-500">
-              The engineering team is coming on-site for the reasons below. All pre-ticket checks
-              must be verified by your team before raising the related support ticket.
-            </p>
 
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
               {visitReasons.length === 0 ? (
                 <div className="text-xs text-slate-600 flex items-center gap-2">
                   <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                  <span>{visit.purpose || 'Comprehensive on-site IoT hardware inspection and calibration'}</span>
+                  <span>{visit.purpose}</span>
                 </div>
               ) : (
                 visitReasons.map((reason, idx) => (
@@ -217,10 +214,39 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
             </div>
           </div>
 
-          {/* Contact Person Name */}
+          {/* Welcoming person on the factory side */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                <span>Welcoming Person</span>
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={hostName}
+                onChange={(e) => {
+                  setHostName(e.target.value);
+                  setError(null);
+                }}
+                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3.5 py-2 text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-sm"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Welcoming Person Phone</label>
+              <input
+                type="tel"
+                value={hostPhone}
+                onChange={(e) => setHostPhone(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3.5 py-2 text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-sm"
+              />
+            </div>
+          </div>
+
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-              <span>Authorized Factory Contact / Acknowledged By</span>
+              <span>Acknowledged By</span>
               <span className="text-red-500">*</span>
             </label>
             <input
@@ -232,15 +258,12 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
             />
           </div>
 
-          {/* Optional Gate Pass / Security clearance notes */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
-              <span>Security Clearance / Gate Pass Notes</span>
-              <span className="text-[10px] text-slate-400 font-normal">Optional</span>
+            <label className="text-xs font-semibold text-slate-700">
+              Security Clearance / Gate Pass Notes
             </label>
             <textarea
               rows={2}
-              placeholder="e.g. Gate pass #GP-1044 registered at Security Post 1. Escort provided..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-sm"
@@ -270,7 +293,7 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                 <span>Acknowledging...</span>
               </>
             ) : (
-              <span>Approve & Acknowledge Visit</span>
+              <span>Acknowledge Visit</span>
             )}
           </button>
         </div>

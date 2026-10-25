@@ -71,8 +71,19 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
   const [completionAudit, setCompletionAudit] = useState<PrechecklistAuditItem[]>([]);
   const [completeSummary, setCompleteSummary] = useState('');
   const [flagReason, setFlagReason] = useState('');
+  const [problemSolved, setProblemSolved] = useState<boolean | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [completeHostName, setCompleteHostName] = useState('');
+  const [completeHostPhone, setCompleteHostPhone] = useState('');
   const [completionError, setCompletionError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+
+  // Client Resolution Confirmation modal state (Company Admin sign-off)
+  const [clientConfirmVisit, setClientConfirmVisit] = useState<VisitingReport | null>(null);
+  const [clientProblemSolved, setClientProblemSolved] = useState<boolean | null>(null);
+  const [clientResolutionNotes, setClientResolutionNotes] = useState('');
+  const [clientConfirmError, setClientConfirmError] = useState<string | null>(null);
+  const [submittingClientConfirm, setSubmittingClientConfirm] = useState(false);
 
   // Debounce search input so typing automatically queries without requiring Enter
   useEffect(() => {
@@ -122,7 +133,8 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
           eventType === 'visiting_report_scheduled' ||
           eventType === 'visiting_report_acknowledged' ||
           eventType === 'visiting_report_updated' ||
-          eventType === 'visiting_report_completed'
+          eventType === 'visiting_report_completed' ||
+          eventType === 'visiting_report_client_confirmed'
         ) {
           loadReports();
         }
@@ -146,31 +158,37 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
     setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
   };
 
-  // Open Completion Modal and populate both checklists
+  // Open Completion Modal and populate the audit and the resolution state
   const handleOpenCompleteModal = (report: VisitingReport) => {
     setCompleteModalVisit(report);
     setCompletionError(null);
     setFlagReason(report.flag_reason || '');
+    setCompleteHostName(report.host_name || '');
+    setCompleteHostPhone(report.host_phone || '');
 
-    // The company's claimed pre-ticket checks, verified on-site.
+    // The company's claimed pre-ticket checks, audited on-site.
     const prechecks = report.ticket_prechecklist || [];
     setCompletionAudit(
       prechecks.map((item, index) => ({
         id: `pre-${index}`,
         task: item.label,
-        status: item.checked ? 'acknowledged' : 'unverified',
+        status: 'unverified',
         note: ''
       }))
     );
 
+    setProblemSolved(
+      typeof report.is_resolved === 'boolean' ? report.is_resolved : null
+    );
+    setResolutionNotes(report.resolution_notes || '');
     setCompleteSummary(report.service_summary || '');
   };
 
-  const setAuditStatus = (id: string | undefined, status: 'acknowledged' | 'flagged') => {
+  const toggleAuditFlag = (id: string | undefined) => {
     setCompletionAudit((prev) =>
       prev.map((item) =>
         item.id === id
-          ? { ...item, status: item.status === status ? 'unverified' : status }
+          ? { ...item, status: item.status === 'flagged' ? 'unverified' : 'flagged' }
           : item
       )
     );
@@ -183,42 +201,70 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
       setCompletionError(null);
       const flaggedItems = completionAudit.filter((item) => item.status === 'flagged');
 
+      if (problemSolved === null) {
+        setCompletionError('Confirm whether the visit solved the problem.');
+        return;
+      }
+
       if (flaggedItems.length > 0 && !flagReason.trim()) {
-        setCompletionError(
-          'Add a reason explaining why the company pre-ticket check(s) are being flagged.'
-        );
+        setCompletionError('Add the reason for flagging the company pre-ticket check(s).');
         return;
       }
 
       setCompleting(true);
-      const acknowledgedCount = completionAudit.filter(
-        (item) => item.status === 'acknowledged'
-      ).length;
-      const totalCount = completionAudit.length;
-      const summaryText = completeSummary.trim() ||
-        (totalCount > 0
-          ? `${acknowledgedCount} of ${totalCount} company pre-ticket checks acknowledged on-site.`
-          : 'On-site visit completed.');
-
-      const updated = await api.completeVisit(
-        completeModalVisit.id,
-        summaryText,
-        currentUser.name,
-        currentUser.role,
-        {
-          prechecklist_audit: completionAudit,
-          is_flagged: flaggedItems.length > 0,
-          flag_reason: flagReason.trim()
-        }
-      );
+      const updated = await api.completeVisit(completeModalVisit.id, {
+        service_summary: completeSummary.trim(),
+        completed_by: currentUser.name,
+        user_role: currentUser.role,
+        prechecklist_audit: completionAudit,
+        is_flagged: flaggedItems.length > 0,
+        flag_reason: flagReason.trim(),
+        is_resolved: problemSolved,
+        resolution_notes: resolutionNotes.trim(),
+        host_name: completeHostName.trim(),
+        host_phone: completeHostPhone.trim()
+      });
       setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       setCompleteModalVisit(null);
       setCompleteSummary('');
       setFlagReason('');
+      setProblemSolved(null);
+      setResolutionNotes('');
+      setCompleteHostName('');
+      setCompleteHostPhone('');
     } catch (err: any) {
       setCompletionError(err.message || 'Failed to complete visit');
     } finally {
       setCompleting(false);
+    }
+  };
+
+  const handleClientConfirmSubmit = async () => {
+    if (!clientConfirmVisit) return;
+    if (clientProblemSolved === null) {
+      setClientConfirmError('Confirm whether the problem is solved.');
+      return;
+    }
+    try {
+      setSubmittingClientConfirm(true);
+      setClientConfirmError(null);
+      const updated = await api.confirmClientResolution(
+        clientConfirmVisit.id,
+        {
+          client_is_resolved: clientProblemSolved,
+          client_resolution_notes: clientResolutionNotes.trim(),
+          client_resolved_by: currentUser.name,
+          user_role: currentUser.role
+        }
+      );
+      setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setClientConfirmVisit(null);
+      setClientProblemSolved(null);
+      setClientResolutionNotes('');
+    } catch (err: any) {
+      setClientConfirmError(err.message || 'Failed to submit resolution confirmation');
+    } finally {
+      setSubmittingClientConfirm(false);
     }
   };
 
@@ -257,16 +303,9 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         {/* Toolbar Header */}
         <div className="p-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-slate-50/70">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 tracking-tight">
-              {isCompanyAdmin ? 'Visiting Reports & Acknowledgements' : 'Visiting Logs (Factory Field Dispatch)'}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {isCompanyAdmin
-                ? 'Review delegation leader, direct phone, and acknowledge action checklist for your factory.'
-                : 'Dispatch field engineers with calendar dates and track on-site action checklist resolution.'}
-            </p>
-          </div>
+          <h2 className="text-base font-bold text-slate-900 tracking-tight">
+            {isCompanyAdmin ? 'Visiting Reports' : 'Visiting Logs'}
+          </h2>
 
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Search */}
@@ -274,10 +313,9 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
               <Search size={15} className="absolute left-3 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="search visit code, leader, system..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-white border border-slate-300 text-slate-800 pl-9 pr-8 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors shadow-xs placeholder-slate-400"
+                className="bg-white border border-slate-300 text-slate-800 pl-9 pr-8 py-2 rounded-lg text-xs w-56 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors shadow-xs"
               />
               {search && (
                 <button
@@ -361,7 +399,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-sm transition-all flex items-center gap-1.5"
               >
                 <Plus size={15} />
-                <span>Dispatch Factory Visit</span>
+                <span>Schedule Visit</span>
               </button>
             )}
           </div>
@@ -521,6 +559,111 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         )}
                       </div>
 
+                      {/* Welcoming person on the factory side */}
+                      {report.host_name && (
+                        <div className="mt-2 p-2 bg-slate-50 border border-slate-200/80 rounded-lg flex items-center gap-1.5 flex-wrap text-[11px] text-slate-700">
+                          <User size={12} className="text-indigo-600 shrink-0" />
+                          <span className="text-slate-500 font-medium">Welcoming Person:</span>
+                          <span className="font-semibold text-slate-900">{report.host_name}</span>
+                          {report.host_phone && (
+                            <span className="flex items-center gap-1 text-slate-500">
+                              <span>•</span>
+                              <Phone size={10} className="text-emerald-600" />
+                              <a href={`tel:${report.host_phone}`} className="text-blue-600 hover:underline font-medium">
+                                {report.host_phone}
+                              </a>
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Problem resolution status on both provider and client sides */}
+                      {report.status === 'Completed' && (
+                        <div className="mt-2 space-y-1.5">
+                          {/* Provider Resolution */}
+                          {typeof report.is_resolved === 'boolean' && (
+                            <div
+                              className={`p-2 rounded-lg border space-y-0.5 ${
+                                report.is_resolved
+                                  ? 'bg-emerald-50 border-emerald-200'
+                                  : 'bg-amber-50 border-amber-200'
+                              }`}
+                            >
+                              <div
+                                className={`text-[10px] font-bold uppercase tracking-wide flex items-center justify-between gap-1 ${
+                                  report.is_resolved ? 'text-emerald-800' : 'text-amber-800'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1">
+                                  {report.is_resolved ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                                  {report.is_resolved ? 'Provider: Problem Solved' : 'Provider: Problem Not Solved'}
+                                </span>
+                                {report.completed_by && (
+                                  <span className="text-[9px] font-normal lowercase opacity-80">
+                                    by {report.completed_by}
+                                  </span>
+                                )}
+                              </div>
+                              {report.resolution_notes && (
+                                <p className="text-[10px] text-slate-700 leading-relaxed">
+                                  {report.resolution_notes}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Client Confirmation */}
+                          {typeof report.client_is_resolved === 'boolean' ? (
+                            <div
+                              className={`p-2 rounded-lg border space-y-0.5 ${
+                                report.client_is_resolved
+                                  ? 'bg-teal-50 border-teal-200'
+                                  : 'bg-rose-50 border-rose-200'
+                              }`}
+                            >
+                              <div
+                                className={`text-[10px] font-bold uppercase tracking-wide flex items-center justify-between gap-1 ${
+                                  report.client_is_resolved ? 'text-teal-800' : 'text-rose-800'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1">
+                                  {report.client_is_resolved ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                                  {report.client_is_resolved ? 'Client: Problem Solved' : 'Client: Problem Not Solved'}
+                                </span>
+                                {report.client_resolved_by && (
+                                  <span className="text-[9px] font-normal lowercase opacity-80">
+                                    by {report.client_resolved_by}
+                                  </span>
+                                )}
+                              </div>
+                              {report.client_resolution_notes && (
+                                <p className="text-[10px] text-slate-700 leading-relaxed">
+                                  {report.client_resolution_notes}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                              <span>Client Sign-off: Pending</span>
+                              {isCompanyAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setClientConfirmVisit(report);
+                                    setClientProblemSolved(null);
+                                    setClientResolutionNotes('');
+                                    setClientConfirmError(null);
+                                  }}
+                                  className="text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer"
+                                >
+                                  Sign off
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Confidential reason for the visit (never shown to company) */}
                       {isSuperAdmin && internalReasons.length > 0 && (
                         <div className="mt-2 p-2 bg-purple-50/60 border border-purple-200 rounded-lg space-y-1">
@@ -596,8 +739,25 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         </button>
                       )}
 
+                      {/* Company Admin Client Confirm Button */}
+                      {isCompanyAdmin && report.status === 'Completed' && typeof report.client_is_resolved !== 'boolean' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setClientConfirmVisit(report);
+                            setClientProblemSolved(null);
+                            setClientResolutionNotes('');
+                            setClientConfirmError(null);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-sm transition-all flex items-center gap-1.5"
+                        >
+                          <CheckCircle2 size={14} />
+                          <span>Confirm Resolution</span>
+                        </button>
+                      )}
+
                       {/* Already Finished State */}
-                      {(report.status === 'Completed' || (isCompanyAdmin && report.status === 'Acknowledged')) && (
+                      {((report.status === 'Completed' && (!isCompanyAdmin || typeof report.client_is_resolved === 'boolean')) || (isCompanyAdmin && report.status === 'Acknowledged')) && (
                         <span className="text-[11px] text-slate-500 font-medium">
                           {report.status === 'Completed' ? '✓ Logged Complete' : '✓ Acknowledged'}
                         </span>
@@ -708,6 +868,12 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                               {leadPhone}
                             </a>
                           )}
+                          {report.host_name && (
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              Welcoming: <strong className="text-slate-700">{report.host_name}</strong>
+                              {report.host_phone ? ` · ${report.host_phone}` : ''}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3.5 px-4 align-top">
                           {visitReasons.length > 0 ? (
@@ -784,6 +950,32 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                           >
                             {report.status}
                           </span>
+                          {report.status === 'Completed' && (
+                            <div className="mt-1 space-y-0.5">
+                              {typeof report.is_resolved === 'boolean' && (
+                                <div
+                                  className={`text-[10px] font-semibold ${
+                                    report.is_resolved ? 'text-emerald-700' : 'text-amber-700'
+                                  }`}
+                                >
+                                  {report.is_resolved ? 'Provider: Solved' : 'Provider: Not Solved'}
+                                </div>
+                              )}
+                              {typeof report.client_is_resolved === 'boolean' ? (
+                                <div
+                                  className={`text-[10px] font-semibold ${
+                                    report.client_is_resolved ? 'text-teal-700' : 'text-rose-700'
+                                  }`}
+                                >
+                                  {report.client_is_resolved ? 'Client: Solved' : 'Client: Not Solved'}
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-slate-400">
+                                  Client: Pending
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           {isCompanyAdmin && report.status === 'Pending Acknowledgement' && (
@@ -806,7 +998,22 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                             </button>
                           )}
 
-                          {(report.status === 'Completed' || (isCompanyAdmin && report.status === 'Acknowledged')) && (
+                          {isCompanyAdmin && report.status === 'Completed' && typeof report.client_is_resolved !== 'boolean' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setClientConfirmVisit(report);
+                                setClientProblemSolved(null);
+                                setClientResolutionNotes('');
+                                setClientConfirmError(null);
+                              }}
+                              className="px-3 py-1 rounded-md text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xs"
+                            >
+                              Confirm
+                            </button>
+                          )}
+
+                          {((report.status === 'Completed' && (!isCompanyAdmin || typeof report.client_is_resolved === 'boolean')) || (isCompanyAdmin && report.status === 'Acknowledged')) && (
                             <span className="text-[11px] text-slate-400 italic">
                               {report.status === 'Completed' ? 'Logged' : 'Confirmed'}
                             </span>
@@ -946,9 +1153,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={18} className="text-blue-600" />
-                <h3 className="text-base font-bold text-slate-900">
-                  Log Visit Resolution & Checklist Completion
-                </h3>
+                <h3 className="text-base font-bold text-slate-900">Complete Visit</h3>
               </div>
               <button
                 onClick={() => setCompleteModalVisit(null)}
@@ -970,6 +1175,66 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 </div>
               )}
 
+              {/* Welcoming person */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Welcoming Person</label>
+                  <input
+                    type="text"
+                    value={completeHostName}
+                    onChange={(e) => setCompleteHostName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Welcoming Person Phone</label>
+                  <input
+                    type="tel"
+                    value={completeHostPhone}
+                    onChange={(e) => setCompleteHostPhone(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Reason for Visit (Client-facing) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  <ListTodo size={13} className="text-indigo-600" />
+                  <span>Reason for Visit</span>
+                </label>
+                {(completeModalVisit.visit_reasons || []).length > 0 ? (
+                  <div className="space-y-1">
+                    {(completeModalVisit.visit_reasons || []).map((reason, idx) => (
+                      <div key={reason.id || idx} className="text-[11px] text-slate-700 flex items-start gap-1.5">
+                        <span className="mt-0.5 shrink-0 text-indigo-500">•</span>
+                        <span className="break-words">{reason.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-600">{completeModalVisit.purpose}</p>
+                )}
+              </div>
+
+              {/* Confidential reason for the visit (provider only) */}
+              {(completeModalVisit.internal_visit_reasons || []).length > 0 && (
+                <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-3.5 space-y-2">
+                  <label className="text-xs font-bold text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                    <Lock size={13} className="text-purple-600" />
+                    <span>Confidential Reason for Visit</span>
+                  </label>
+                  <div className="space-y-1">
+                    {(completeModalVisit.internal_visit_reasons || []).map((reason, idx) => (
+                      <div key={reason.id || idx} className="text-[11px] text-purple-900 flex items-start gap-1.5">
+                        <span className="mt-0.5 shrink-0 text-purple-400">•</span>
+                        <span className="break-words">{reason.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Audit of the company's claimed pre-ticket checks */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -978,93 +1243,45 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                     <span>Company Pre-Ticket Checklist Audit</span>
                   </label>
                   <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                    {completionAudit.filter((c) => c.status === 'acknowledged').length} of {completionAudit.length} Acknowledged
+                    {completionAudit.filter((c) => c.status === 'flagged').length} of {completionAudit.length} Flagged
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  These are the checks the company had to verify before raising the ticket. Acknowledge
-                  the ones that really were done. If the fault was simple enough that following the
-                  checklist would have avoided the visit, use <strong className="text-red-600">Flag</strong>.
-                  Flags are visible to Super Admins only.
-                </p>
 
                 {completionAudit.length === 0 ? (
                   <div className="p-3 text-[11px] text-slate-500 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
-                    This visit is not linked to a ticket with pre-ticket checks, so there is nothing to audit.
+                    No pre-ticket checks on the linked ticket.
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto pt-1 pr-1">
                     {completionAudit.map((item, idx) => {
-                      const isAcknowledged = item.status === 'acknowledged';
                       const isFlagged = item.status === 'flagged';
                       return (
                         <div
                           key={item.id || idx}
-                          className={`p-3 rounded-xl border transition-all space-y-2 ${
-                            isFlagged
-                              ? 'bg-red-50 border-red-300'
-                              : isAcknowledged
-                                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
-                                : 'bg-slate-50 border-slate-200'
+                          className={`p-3 rounded-xl border transition-all flex items-start gap-2.5 ${
+                            isFlagged ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200'
                           }`}
                         >
-                          <div className="flex items-start gap-2.5">
-                            <span className={`w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
+                          <span className={`w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
+                            isFlagged ? 'bg-red-200 text-red-800' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs font-semibold leading-relaxed flex-1 min-w-0">
+                            {item.task}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleAuditFlag(item.id)}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 border shrink-0 ${
                               isFlagged
-                                ? 'bg-red-200 text-red-800'
-                                : isAcknowledged
-                                  ? 'bg-emerald-200 text-emerald-800'
-                                  : 'bg-slate-200 text-slate-600'
-                            }`}>
-                              {idx + 1}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-xs font-semibold leading-relaxed block">
-                                {item.task}
-                              </span>
-                              <span className={`inline-flex items-center gap-1 text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded border ${
-                                isFlagged
-                                  ? 'bg-red-100 text-red-800 border-red-200'
-                                  : isAcknowledged
-                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                    : 'bg-slate-100 text-slate-500 border-slate-200'
-                              }`}>
-                                {isFlagged
-                                  ? 'Claimed by company but not actually done'
-                                  : isAcknowledged
-                                    ? 'Acknowledged: the company really did this'
-                                    : 'Not reviewed on-site yet'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setAuditStatus(item.id, 'acknowledged')}
-                              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 ${
-                                isAcknowledged
-                                  ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                                  : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
-                              }`}
-                            >
-                              <CheckCircle2 size={12} />
-                              <span>Acknowledge</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setAuditStatus(item.id, 'flagged')}
-                              title="Flag this check: it was claimed but not actually done"
-                              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 border ${
-                                isFlagged
-                                  ? 'bg-red-600 text-white border-red-600 hover:bg-red-500'
-                                  : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
-                              }`}
-                            >
-                              <Flag size={12} />
-                              <span>Flag</span>
-                            </button>
-                          </div>
+                                ? 'bg-red-600 text-white border-red-600 hover:bg-red-500'
+                                : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
+                            }`}
+                          >
+                            <Flag size={12} />
+                            <span>{isFlagged ? 'Flagged' : 'Flag'}</span>
+                          </button>
                         </div>
                       );
                     })}
@@ -1082,13 +1299,9 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                       <ShieldAlert size={12} className="text-red-500" />
                       Audit Flag Reason
                     </span>
-                    {completionAudit.some((item) => item.status === 'flagged') && (
-                      <span className="text-[10px] text-red-600 font-bold">Required</span>
-                    )}
                   </label>
                   <textarea
                     rows={2}
-                    placeholder="Explain what the company claimed was checked and what the on-site team found..."
                     value={flagReason}
                     onChange={(e) => {
                       setFlagReason(e.target.value);
@@ -1099,32 +1312,61 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 </div>
               </div>
 
-              {/* Confidential reason for the visit (provider only) */}
-              {(completeModalVisit.internal_visit_reasons || []).length > 0 && (
-                <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-3.5 space-y-2">
-                  <label className="text-xs font-bold text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
-                    <Lock size={13} className="text-purple-600" />
-                    <span>Confidential Reason for this Visit</span>
-                  </label>
-                  <div className="space-y-1">
-                    {(completeModalVisit.internal_visit_reasons || []).map((reason, idx) => (
-                      <div key={reason.id || idx} className="text-[11px] text-purple-900 flex items-start gap-1.5">
-                        <span className="mt-0.5 shrink-0 text-purple-400">•</span>
-                        <span className="break-words">{reason.label}</span>
-                      </div>
-                    ))}
-                  </div>
+              {/* Final confirmation: was the reported problem solved by this visit? */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  {problemSolved === false ? (
+                    <XCircle size={14} className="text-amber-600" />
+                  ) : (
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                  )}
+                  <span>Problem Solved?</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProblemSolved(true);
+                      setCompletionError(null);
+                    }}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
+                      problemSolved === true
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>Yes, Solved</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProblemSolved(false);
+                      setCompletionError(null);
+                    }}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
+                      problemSolved === false
+                        ? 'bg-amber-600 text-white border-amber-600'
+                        : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
+                    }`}
+                  >
+                    <XCircle size={14} />
+                    <span>No, Not Solved</span>
+                  </button>
                 </div>
-              )}
+                <textarea
+                  rows={2}
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-xs focus:bg-white focus:outline-none focus:border-blue-500 shadow-sm"
+                />
+              </div>
 
               {/* Service Summary & Field Notes */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">
-                  Additional Service Remarks & Maintenance Notes (Optional)
-                </label>
+                <label className="text-xs font-semibold text-slate-700">Service Remarks</label>
                 <textarea
                   rows={3}
-                  placeholder="Details of calibration, parts replaced, sensor diagnostic logs, or follow-up recommendations..."
                   value={completeSummary}
                   onChange={(e) => setCompleteSummary(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-xs focus:bg-white focus:outline-none focus:border-blue-500 shadow-sm"
@@ -1133,22 +1375,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
-              <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                {completionAudit.some((item) => item.status === 'flagged') ? (
-                  <>
-                    <Flag size={12} className="text-red-500" />
-                    <span className="text-red-600 font-semibold">
-                      {completionAudit.filter((item) => item.status === 'flagged').length} check(s) flagged
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Lock size={12} className="text-slate-400" />
-                    Flags are visible to Super Admins only
-                  </>
-                )}
-              </span>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -1164,13 +1391,189 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                   disabled={completing}
                   className="px-5 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  {completing ? (
-                    'Saving Completion...'
-                  ) : (
-                    `Confirm Visit Completed (${completionAudit.filter((c) => c.status === 'acknowledged').length}/${completionAudit.length} Acknowledged)`
-                  )}
+                  {completing ? 'Saving...' : 'Confirm Completion'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Client Resolution Confirmation Modal (Company Admin sign-off) */}
+      {clientConfirmVisit && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setClientConfirmVisit(null)}
+        >
+          <div
+            className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={18} className="text-indigo-600" />
+                <h3 className="text-base font-bold text-slate-900">Confirm Visit Resolution</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setClientConfirmVisit(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                Visit: <strong className="text-indigo-600">{clientConfirmVisit.visit_code}</strong> • {clientConfirmVisit.target_system} ({clientConfirmVisit.company_name})
+              </div>
+
+              {clientConfirmError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start gap-2 shadow-sm">
+                  <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
+                  <span>{clientConfirmError}</span>
+                </div>
+              )}
+
+              {/* Welcoming person if present */}
+              {clientConfirmVisit.host_name && (
+                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-2 text-xs text-slate-700">
+                  <User size={13} className="text-indigo-600 shrink-0" />
+                  <span className="text-slate-500 font-medium">Welcoming Person:</span>
+                  <span className="font-semibold text-slate-900">{clientConfirmVisit.host_name}</span>
+                  {clientConfirmVisit.host_phone && (
+                    <span className="text-slate-500">• {clientConfirmVisit.host_phone}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Reason for Visit */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  <ListTodo size={13} className="text-indigo-600" />
+                  <span>Reason for Visit</span>
+                </label>
+                {(clientConfirmVisit.visit_reasons || []).length > 0 ? (
+                  <div className="space-y-1 pt-1">
+                    {(clientConfirmVisit.visit_reasons || []).map((reason, idx) => (
+                      <div key={reason.id || idx} className="text-[11px] text-slate-700 flex items-start gap-1.5 leading-tight">
+                        <span className="mt-0.5 shrink-0 text-indigo-500">•</span>
+                        <span className="break-words">{reason.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-600">{clientConfirmVisit.purpose}</p>
+                )}
+              </div>
+
+              {/* Provider Resolution Status */}
+              {typeof clientConfirmVisit.is_resolved === 'boolean' && (
+                <div
+                  className={`p-3 rounded-xl border space-y-1 ${
+                    clientConfirmVisit.is_resolved
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-amber-50 border-amber-200'
+                  }`}
+                >
+                  <div
+                    className={`text-xs font-bold uppercase tracking-wide flex items-center justify-between ${
+                      clientConfirmVisit.is_resolved ? 'text-emerald-800' : 'text-amber-800'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {clientConfirmVisit.is_resolved ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                      {clientConfirmVisit.is_resolved ? 'Provider Status: Problem Solved' : 'Provider Status: Problem Not Solved'}
+                    </span>
+                    {clientConfirmVisit.completed_by && (
+                      <span className="text-[10px] font-normal lowercase opacity-80">
+                        by {clientConfirmVisit.completed_by}
+                      </span>
+                    )}
+                  </div>
+                  {clientConfirmVisit.resolution_notes && (
+                    <p className="text-xs text-slate-700 leading-relaxed pt-0.5">
+                      {clientConfirmVisit.resolution_notes}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Client Verdict: Problem Solved? */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  {clientProblemSolved === false ? (
+                    <XCircle size={14} className="text-rose-600" />
+                  ) : (
+                    <CheckCircle2 size={14} className="text-teal-600" />
+                  )}
+                  <span>Problem Solved?</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClientProblemSolved(true);
+                      setClientConfirmError(null);
+                    }}
+                    className={`px-3 py-2.5 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
+                      clientProblemSolved === true
+                        ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                        : 'bg-white text-teal-700 border-teal-200 hover:bg-teal-50'
+                    }`}
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>Yes, Solved</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClientProblemSolved(false);
+                      setClientConfirmError(null);
+                    }}
+                    className={`px-3 py-2.5 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
+                      clientProblemSolved === false
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                        : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
+                    }`}
+                  >
+                    <XCircle size={14} />
+                    <span>No, Not Solved</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Client Remarks */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Remarks</label>
+                <textarea
+                  rows={3}
+                  value={clientResolutionNotes}
+                  onChange={(e) => setClientResolutionNotes(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setClientConfirmVisit(null)}
+                disabled={submittingClientConfirm}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 transition-colors shadow-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleClientConfirmSubmit}
+                disabled={submittingClientConfirm}
+                className="px-5 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {submittingClientConfirm ? 'Submitting...' : 'Submit Confirmation'}
+              </button>
             </div>
           </div>
         </div>

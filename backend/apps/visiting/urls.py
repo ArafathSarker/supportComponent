@@ -4,6 +4,7 @@ from .views import (
     VisitingReportDetailView,
     VisitingReportAcknowledgeView,
     VisitingReportCompleteView,
+    VisitingReportClientConfirmView,
 )
 
 urlpatterns = [
@@ -14,4 +15,6 @@ urlpatterns = [
     path('<str:visit_id>/acknowledge/', VisitingReportAcknowledgeView.as_view(), name='visiting-acknowledge-slash'),
     path('<str:visit_id>/complete', VisitingReportCompleteView.as_view(), name='visiting-complete'),
     path('<str:visit_id>/complete/', VisitingReportCompleteView.as_view(), name='visiting-complete-slash'),
+    path('<str:visit_id>/confirm-resolution', VisitingReportClientConfirmView.as_view(), name='visiting-client-confirm'),
+    path('<str:visit_id>/confirm-resolution/', VisitingReportClientConfirmView.as_view(), name='visiting-client-confirm-slash'),
 ]

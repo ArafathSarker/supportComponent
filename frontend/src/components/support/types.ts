@@ -175,7 +175,7 @@ export interface PrechecklistItem {
 export interface PrechecklistAuditItem {
   id?: string;
   task: string;
-  status: 'acknowledged' | 'flagged' | 'unverified';
+  status: 'flagged' | 'unverified';
   note?: string;
 }
 
@@ -199,6 +199,8 @@ export interface VisitingReport {
   visit_reasons?: VisitReason[];
   internal_visit_reasons?: VisitReason[];
   show_visitor_count?: boolean;
+  host_name?: string;
+  host_phone?: string;
   prechecklist_audit?: PrechecklistAuditItem[];
   is_flagged?: boolean;
   flag_reason?: string;
@@ -214,7 +216,14 @@ export interface VisitingReport {
   acknowledged_at?: string;
   acknowledged_by?: string;
   completed_at?: string;
+  completed_by?: string;
   service_summary?: string;
+  is_resolved?: boolean | null;
+  resolution_notes?: string;
+  client_is_resolved?: boolean | null;
+  client_resolution_notes?: string;
+  client_resolved_at?: string;
+  client_resolved_by?: string;
   created_at: string;
   updated_at: string;
 }

@@ -103,7 +103,6 @@ export const SupportTicketModule: React.FC<SupportTicketProps> = ({
           <button
             type="button"
             onClick={() => handleToggleRole(role === 'company_admin' ? 'super_admin' : 'company_admin')}
-            title="Toggle perspective to test both Company Owner and Solution Provider permissions"
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all shadow-xs"
           >
             <Wrench size={13} className="text-slate-600" />

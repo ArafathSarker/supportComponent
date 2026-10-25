@@ -2,10 +2,8 @@ export interface IotFieldDefinition {
   key: string;
   label: string;
   type: 'text' | 'select';
-  placeholder?: string;
   options?: string[];
   required?: boolean;
-  helpText?: string;
 }
 
 export interface ProblemCategoryConfig {
@@ -27,15 +25,12 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'sensor_id',
         label: 'Sensor / Hardware Device Tag ID',
         type: 'text',
-        placeholder: 'e.g. SEN-OP-402, PR-TRANS-104, IOT-BOX-12',
         required: true,
-        helpText: 'Printed on the physical sensor housing or mounting plate'
       },
       {
         key: 'machine_model',
         label: 'Attached Machine Model & Line',
         type: 'text',
-        placeholder: 'e.g. Juki DDL-9000C (Line 04), Pegasus Overlock, Main Boiler',
         required: true
       },
       {
@@ -55,7 +50,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'telemetry_reading',
         label: 'Observed Telemetry / Analog Value',
         type: 'text',
-        placeholder: 'e.g. 0 RPM (flatline), 7.2 Bar, NaN, Overheating 95°C',
         required: true
       },
       {
@@ -88,7 +82,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'app_version',
         label: 'App Build / Edge Firmware Version',
         type: 'text',
-        placeholder: 'e.g. v3.4.2-firmware, Android Tablet v2.1.0',
         required: true
       },
       {
@@ -108,7 +101,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'error_code_log',
         label: 'Error Code or Console / Log Snippet',
         type: 'text',
-        placeholder: 'e.g. ERR_MQTT_CONN_LOST, Code 500 JSON parse exception'
       },
       {
         key: 'reproducibility',
@@ -140,9 +132,7 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'gateway_mac',
         label: 'Gateway Identifier / MAC Address',
         type: 'text',
-        placeholder: 'e.g. GW-SEWING-FL2-NORTH, B8:27:EB:D3:5F:11',
         required: true,
-        helpText: 'Labeled on top of the industrial DIN-rail gateway enclosure'
       },
       {
         key: 'connection_type',
@@ -173,7 +163,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'affected_zone',
         label: 'Affected Factory Floor Zone',
         type: 'text',
-        placeholder: 'e.g. Floor 2 Sewing Lines 01-08, Boiler Basement'
       }
     ],
     troubleshootingChecklist: [
@@ -219,14 +208,12 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'date_range',
         label: 'Affected Date Range',
         type: 'text',
-        placeholder: 'e.g. 2026-10-18 to 2026-10-20, Morning Shift',
         required: true
       },
       {
         key: 'data_variance',
         label: 'Observed Data Discrepancy',
         type: 'text',
-        placeholder: 'e.g. 2-hour data gap between 10 AM - 12 PM, Output reads 0 while machines were running'
       }
     ],
     troubleshootingChecklist: [
@@ -247,7 +234,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'display_terminal',
         label: 'Display Interface / Screen Location',
         type: 'text',
-        placeholder: 'e.g. Overhead TV Line 05, Central Control Room Monitor 2, Kiosk Tablet',
         required: true
       },
       {
@@ -294,7 +280,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'user_identity',
         label: 'Target User Email / Employee ID / Badge ID',
         type: 'text',
-        placeholder: 'e.g. arafath@csismart.com, EMP-4019, RFID #88129',
         required: true
       },
       {
@@ -340,7 +325,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'license_ref',
         label: 'License Key / Subscription Reference',
         type: 'text',
-        placeholder: 'e.g. LIC-CSI-GARMENT-2026, PO-10492',
         required: true
       },
       {
@@ -385,21 +369,18 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'installation_line',
         label: 'Factory Section / New Line Number',
         type: 'text',
-        placeholder: 'e.g. Building 1 - New Sewing Line 17, Cutter Section C',
         required: true
       },
       {
         key: 'equipment_count',
         label: 'Number of Machines to Commission',
         type: 'text',
-        placeholder: 'e.g. 28 Juki Overlock Machines, 2 Gateways',
         required: true
       },
       {
         key: 'target_golive_date',
         label: 'Target Commissioning / Go-Live Date',
         type: 'text',
-        placeholder: 'e.g. 2026-11-05',
         required: true
       },
       {
@@ -433,14 +414,12 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'enquiry_topic',
         label: 'Enquiry Topic',
         type: 'text',
-        placeholder: 'e.g. Third-party sensor integration, Custom ERP API sync',
         required: true
       },
       {
         key: 'contact_person',
         label: 'Floor Contact Person & Phone',
         type: 'text',
-        placeholder: 'e.g. Mr. Rafiq (Factory Maintenance Lead) - +880 1700-000000',
         required: true
       },
       {
@@ -472,15 +451,12 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'sensor_id',
         label: 'Sensor / IoT Module ID',
         type: 'text',
-        placeholder: 'e.g. SEN-NEEDLE-402, IOT-STITCH-14',
         required: true,
-        helpText: 'Printed on the sensor module label mounted near the handwheel'
       },
       {
         key: 'machine_model',
         label: 'Sewing Machine Model & Brand',
         type: 'text',
-        placeholder: 'e.g. Juki DDL-9000C, Brother S-7200A, Pegasus Overlock',
         required: true
       },
       {
@@ -526,9 +502,7 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'gateway_id',
         label: 'Gateway Identifier / MAC Address',
         type: 'text',
-        placeholder: 'e.g. GW-SEWING-FL2-NORTH, B8:27:EB:D3:5F',
         required: true,
-        helpText: 'Labeled on top of the industrial DIN-rail gateway enclosure'
       },
       {
         key: 'connectivity_type',
@@ -559,7 +533,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'affected_machines_count',
         label: 'Estimated Offline Machine Count',
         type: 'text',
-        placeholder: 'e.g. 24 sewing machines (Entire Line 07)'
       }
     ],
     troubleshootingChecklist: [
@@ -580,22 +553,18 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'equipment_tag',
         label: 'Target Boiler / Compressor Unit',
         type: 'text',
-        placeholder: 'e.g. Boiler 01 - Main Steam Header, Atlas Copco GA-37',
         required: true
       },
       {
         key: 'physical_gauge_reading',
         label: 'Physical Analog Dial Gauge Reading',
         type: 'text',
-        placeholder: 'e.g. 6.5 Bar, 8.0 Bar, 110 PSI',
         required: true,
-        helpText: 'Read directly from the analog needle gauge on the pipe'
       },
       {
         key: 'telemetry_reading',
         label: 'IoT Dashboard Reading Value',
         type: 'text',
-        placeholder: 'e.g. Reads 0.0 Bar, Frozen at 4.2 Bar, Spiking 0-14 Bar',
         required: true
       },
       {
@@ -628,7 +597,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'terminal_id',
         label: 'Terminal / Tablet Station ID',
         type: 'text',
-        placeholder: 'e.g. TRM-LINE-04-OP12, TABLET-QC-02',
         required: true
       },
       {
@@ -674,7 +642,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'cutter_asset_tag',
         label: 'Cutter / Spreader Asset Tag',
         type: 'text',
-        placeholder: 'e.g. CNC-CUTTER-01, AUTO-SPREADER-A',
         required: true
       },
       {
@@ -694,8 +661,6 @@ export const GARMENTS_IOT_CATEGORIES: ProblemCategoryConfig[] = [
         key: 'plc_alarm_code',
         label: 'PLC / CNC Controller Error Code',
         type: 'text',
-        placeholder: 'e.g. ALARM 104 - SERVO OVERLOAD, VACUUM LOW 402',
-        helpText: 'Displayed on the machine touchscreen operator panel'
       }
     ],
     troubleshootingChecklist: [

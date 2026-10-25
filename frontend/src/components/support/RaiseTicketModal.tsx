@@ -194,9 +194,6 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
               <h3 className="text-base font-bold text-slate-900 tracking-tight">
                 Raise Support Ticket
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Submit an urgent issue report to our engineering support team
-              </p>
             </div>
           </div>
           <button
@@ -220,15 +217,14 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
           {/* Title */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-              <span>Title / Problem Summary</span>
+              <span>Title</span>
               <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. Sewing Machine needle optical sensor disconnected on Line 04"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3.5 py-2.5 text-xs focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm placeholder-slate-400"
+              className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3.5 py-2.5 text-xs focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm"
               required
             />
           </div>
@@ -265,8 +261,8 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
                 {categoryList.length === 0 ? (
                   <option value="">
                     {categoriesLoading
-                      ? 'Loading managed categories...'
-                      : 'No categories yet — add them in Support Ticket Management'}
+                      ? 'Loading categories...'
+                      : 'No categories available'}
                   </option>
                 ) : (
                   categoryList.map((cat) => (
@@ -276,13 +272,10 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
                   ))
                 )}
               </select>
-              <p className="text-[10px] text-slate-400">
-                Categories and their pre-ticket checks are maintained in Support Ticket Management.
-              </p>
             </div>
           </div>
 
-          {/* Pre-Troubleshooting Checklist (Context-specific for selected problem category) */}
+          {/* Pre-Troubleshooting Checklist */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
@@ -297,11 +290,6 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
                 {checkedItems.length} of {preChecklist.length} Verified
               </span>
             </div>
-
-            <p className="text-[11px] text-slate-500">
-              Every step below must be verified on the factory floor before this ticket can be raised.
-              Our engineers audit these claims during an on-site visit and flag any that were not done.
-            </p>
 
             <div className="space-y-1.5 pt-1">
               {preChecklist.length === 0 && (
@@ -389,7 +377,6 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
               <label className="text-xs font-semibold text-slate-700">Line Number</label>
               <input
                 type="text"
-                placeholder="e.g. Line 04, Unit B"
                 value={lineNumber}
                 onChange={(e) => setLineNumber(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 shadow-sm"
@@ -397,26 +384,25 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
             </div>
           </div>
 
-          {/* Detailed Problem Description */}
+          {/* Description */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-              <span>Describe the Problem in Detail</span>
+              <span>Description</span>
               <span className="text-red-500">*</span>
             </label>
             <textarea
               rows={4}
-              placeholder="Provide exact details of what happened, symptoms noticed, machine behavior, or error codes..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-3 text-xs focus:bg-white focus:outline-none focus:border-blue-500 resize-y shadow-sm placeholder-slate-400"
+              className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg p-3 text-xs focus:bg-white focus:outline-none focus:border-blue-500 resize-y shadow-sm"
               required
             />
           </div>
 
-          {/* Attach Evidence (Photos or Videos) */}
+          {/* Attachments */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
-              <span>Attach Supporting Evidence (Photos or Videos)</span>
+              <span>Attachments</span>
               <span className="text-[11px] text-slate-400 font-normal">Optional</span>
             </label>
             <div className="relative border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-4 transition-colors bg-slate-50/60 hover:bg-blue-50/20 text-center">
@@ -428,14 +414,11 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />
               <div className="flex flex-col items-center justify-center space-y-1 text-slate-500">
-                <Upload size={22} className="text-blue-500" />
+                <Upload size={20} className="text-blue-500" />
                 <span className="text-xs font-medium text-slate-700">
                   {files && files.length > 0 
                     ? `${files.length} file(s) selected: ${Array.from(files).map(f => f.name).join(', ')}` 
-                    : 'Click to choose photos or videos, or drag & drop files here'}
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  PNG, JPG, MP4, WebM, PDF up to 50MB
+                    : 'Select files'}
                 </span>
               </div>
             </div>
@@ -456,11 +439,6 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={submitting || checkedItems.length < preChecklist.length}
-            title={
-              checkedItems.length < preChecklist.length
-                ? 'Verify every pre-ticket check before raising this ticket'
-                : undefined
-            }
             className="px-5 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
           >
             {submitting ? (

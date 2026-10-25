@@ -32,23 +32,53 @@ class SupportEmployee(models.Model):
         return f"{self.name} ({self.phone})"
 
 
+class ProblemCategory(models.Model):
+    """
+    Problem category for support tickets, managed by the Super Admin.
+
+    Both the category itself and its pre-ticket checklist are dynamic: the
+    checklist lives in the `checklist` JSON column, which PostgreSQL stores as
+    `jsonb`, so a new category (and the checks it requires) can be added from
+    Support Ticket Management without a code change:
+
+        {'name': 'Network / Connectivity Issue',
+         'checklist': ['Verified PoE link lights', 'Power-cycled the gateway']}
+    """
+    id = models.CharField(primary_key=True, default=generate_uuid, max_length=36, editable=False)
+    name = models.CharField(max_length=150, unique=True)
+    description = models.CharField(max_length=255, blank=True, default='')
+    checklist = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Pre-ticket checks the company must verify before raising a ticket.',
+    )
+    sort_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'support_problem_categories'
+        ordering = ['sort_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
 class ChecklistOption(models.Model):
     """
-    Dynamic option managed in Support Ticket Management.
+    Managed reason for a factory visit.
 
-    These are reasons for a factory visit, not task checklists:
-      * `visit_reason`     - the reason shared with the company owner.
-      * `internal_reason`  - the confidential reason the visit is really made for.
-      * `prechecklist`     - a pre-ticket check item that belongs to a problem
-        category (`category`). It must be verified before a ticket is raised.
+      * `visit_reason`    - the reason shared with the company owner.
+      * `internal_reason` - the confidential reason the visit is really made for.
+
+    The pre-ticket checks of a problem category live on `ProblemCategory`.
     """
     KIND_VISIT_REASON = 'visit_reason'
     KIND_INTERNAL_REASON = 'internal_reason'
-    KIND_PRECHECKLIST = 'prechecklist'
     KIND_CHOICES = [
         (KIND_VISIT_REASON, 'Reason for visit (visible to client)'),
         (KIND_INTERNAL_REASON, 'Confidential reason for visit'),
-        (KIND_PRECHECKLIST, 'Problem category pre-ticket check'),
     ]
 
     id = models.CharField(primary_key=True, default=generate_uuid, max_length=36, editable=False)

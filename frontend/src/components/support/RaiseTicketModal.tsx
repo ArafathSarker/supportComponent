@@ -14,10 +14,9 @@ import {
   Square,
   ListChecks
 } from 'lucide-react';
-import type { Ticket, TicketUrgency, CurrentUser, TicketPriority } from './types';
+import type { Ticket, TicketUrgency, CurrentUser, TicketPriority, ProblemCategory } from './types';
 import { api } from './api';
 import { 
-  GARMENTS_IOT_CATEGORIES, 
   GARMENTS_SYSTEMS, 
   GARMENTS_FLOORS, 
   PRODUCTION_IMPACTS 
@@ -36,64 +35,64 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
   isOpen,
   onClose,
   currentUser,
-  categories,
   systems,
   onTicketCreated
 }) => {
   const systemOptions = systems && systems.length > 0 ? systems : GARMENTS_SYSTEMS;
-  const categoryOptions = categories && categories.length > 0 
-    ? categories 
-    : GARMENTS_IOT_CATEGORIES.map((c) => c.category);
+
+  // Problem categories and their pre-ticket checklists are managed dynamically
+  // in Support Ticket Management, so they are loaded instead of hard-coded.
+  const [categoryList, setCategoryList] = useState<ProblemCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   const [title, setTitle] = useState('');
   const [affectedSystem, setAffectedSystem] = useState(systemOptions[0]);
-  const [selectedCategoryName, setSelectedCategoryName] = useState(categoryOptions[0]);
+  const [selectedCategoryName, setSelectedCategoryName] = useState('');
   const [priority, setPriority] = useState<TicketPriority>('Medium');
   const [productionImpact, setProductionImpact] = useState(PRODUCTION_IMPACTS[0]);
   const [lineNumber, setLineNumber] = useState('Line 04 (Sewing Unit A)');
   const [floorLocation, setFloorLocation] = useState(GARMENTS_FLOORS[1]);
   const [description, setDescription] = useState('');
 
-  // Troubleshooting Pre-Checklist according to selected problem category
-  const selectedCategoryConfig = GARMENTS_IOT_CATEGORIES.find(
-    (c) => c.category.toLowerCase() === selectedCategoryName.toLowerCase()
-  );
-  const configPreChecklist = selectedCategoryConfig?.troubleshootingChecklist || [
-    'Cleaned and inspected physical sensor/equipment',
-    'Checked auxiliary power adapter and LED indicator',
-    'Verified harness connections are secure',
-    'Performed a 30-second restart/power-cycle'
-  ];
-
-  // Pre-ticket checks are managed per problem category in Support Ticket Management.
-  const [managedPreChecklist, setManagedPreChecklist] = useState<string[]>([]);
-  const preChecklist = managedPreChecklist.length > 0 ? managedPreChecklist : configPreChecklist;
+  // Pre-ticket checklist of the selected problem category (jsonb, managed data).
+  const selectedCategory =
+    categoryList.find((item) => item.name === selectedCategoryName) || null;
+  const preChecklist = selectedCategory?.checklist || [];
 
   const [checkedItems, setCheckedItems] = useState<string[]>([]);
 
-  // When problem category changes, load its managed checks and reset verified items
+  // Load the managed problem categories whenever the modal opens
   useEffect(() => {
-    setCheckedItems([]);
+    if (!isOpen) return;
     let cancelled = false;
 
+    setCategoriesLoading(true);
     api
-      .getChecklistOptions({
-        kind: 'prechecklist',
-        category: selectedCategoryName,
-        activeOnly: true,
-        role: currentUser.role,
+      .getProblemCategories({ activeOnly: true, role: currentUser.role })
+      .then((list) => {
+        if (cancelled) return;
+        setCategoryList(list);
+        setSelectedCategoryName((prev) => {
+          if (prev && list.some((item) => item.name === prev)) return prev;
+          return list[0]?.name || '';
+        });
       })
-      .then((options) => {
-        if (!cancelled) setManagedPreChecklist(options.map((option) => option.label));
+      .catch((err: any) => {
+        if (!cancelled) setError(err.message || 'Failed to load problem categories.');
       })
-      .catch(() => {
-        if (!cancelled) setManagedPreChecklist([]);
+      .finally(() => {
+        if (!cancelled) setCategoriesLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [selectedCategoryName, currentUser.role]);
+  }, [isOpen, currentUser.role]);
+
+  // When the problem category changes, reset the verified pre-ticket checks
+  useEffect(() => {
+    setCheckedItems([]);
+  }, [selectedCategoryName]);
 
   const toggleChecklistItem = (item: string) => {
     setCheckedItems((prev) =>
@@ -111,6 +110,10 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
     e.preventDefault();
     if (!title.trim()) {
       setError('Title / Problem Summary is required.');
+      return;
+    }
+    if (!selectedCategoryName) {
+      setError('Select a problem category. Categories are managed in Support Ticket Management.');
       return;
     }
     if (!description.trim()) {
@@ -255,14 +258,27 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
               <select
                 value={selectedCategoryName}
                 onChange={(e) => setSelectedCategoryName(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                disabled={categoriesLoading || categoryList.length === 0}
+                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                required
               >
-                {categoryOptions.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+                {categoryList.length === 0 ? (
+                  <option value="">
+                    {categoriesLoading
+                      ? 'Loading managed categories...'
+                      : 'No categories yet — add them in Support Ticket Management'}
                   </option>
-                ))}
+                ) : (
+                  categoryList.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))
+                )}
               </select>
+              <p className="text-[10px] text-slate-400">
+                Categories and their pre-ticket checks are maintained in Support Ticket Management.
+              </p>
             </div>
           </div>
 
@@ -288,6 +304,13 @@ export const RaiseTicketModal: React.FC<RaiseTicketModalProps> = ({
             </p>
 
             <div className="space-y-1.5 pt-1">
+              {preChecklist.length === 0 && (
+                <div className="p-3 text-center text-[11px] text-slate-500 bg-white rounded-lg border border-dashed border-slate-300">
+                  {selectedCategory
+                    ? 'This problem category has no managed pre-ticket checks yet.'
+                    : 'Select a managed problem category to see its pre-ticket checks.'}
+                </div>
+              )}
               {preChecklist.map((item, idx) => {
                 const isChecked = checkedItems.includes(item);
                 return (

@@ -243,8 +243,8 @@ All endpoints accept standard JSON and return structured responses:
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/visiting/` | List visiting reports with role/company filtering (role-gated internal data) |
-| `POST` | `/api/visiting/` | Schedule a new visit (employee IDs, dual checklists, headcount toggle) |
-| `PATCH` | `/api/visiting/{id}/` | Toggle headcount visibility / update the internal checklist (Super Admin) |
+| `POST` | `/api/visiting/` | Schedule a new visit (employee IDs, searchable visit + confidential reasons, headcount toggle) |
+| `PATCH` | `/api/visiting/{id}/` | Toggle headcount visibility / update the confidential reason (Super Admin) |
 | `POST` | `/api/visiting/{id}/acknowledge/` | Acknowledge visit (gate pass info, escort engineer) |
 | `POST` | `/api/visiting/{id}/complete/` | Complete visit with itemized resolution and optional audit flags |
 
@@ -255,10 +255,14 @@ All endpoints accept standard JSON and return structured responses:
 | `POST` | `/api/support/employees/` | Add a support employee (name + phone required) |
 | `PATCH` | `/api/support/employees/{id}/` | Update an employee |
 | `DELETE` | `/api/support/employees/{id}/` | Remove an employee |
-| `GET` | `/api/support/checklist-options/` | List internal checklist dropdown options |
-| `POST` | `/api/support/checklist-options/` | Add a dropdown option |
-| `PATCH` | `/api/support/checklist-options/{id}/` | Update / enable / disable an option |
-| `DELETE` | `/api/support/checklist-options/{id}/` | Remove an option |
+| `GET` | `/api/support/checklist-options/` | List managed visit reasons (`?kind=visit_reason&search=`) |
+| `POST` | `/api/support/checklist-options/` | Add a visit or confidential reason |
+| `PATCH` | `/api/support/checklist-options/{id}/` | Update / enable / disable a reason |
+| `DELETE` | `/api/support/checklist-options/{id}/` | Remove a reason |
+| `GET` | `/api/support/problem-categories/` | List problem categories with their pre-ticket checklist (`?search=&active_only=1`) |
+| `POST` | `/api/support/problem-categories/` | Add a problem category with its dynamic checklist (`checklist: []`) |
+| `PATCH` | `/api/support/problem-categories/{id}/` | Update a category name, description or checklist |
+| `DELETE` | `/api/support/problem-categories/{id}/` | Remove a problem category |
 
 ### 📁 Uploads API (`/api/upload/`)
 | Method | Endpoint | Description |

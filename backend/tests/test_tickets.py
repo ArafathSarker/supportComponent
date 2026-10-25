@@ -4,12 +4,13 @@ import pytest
 def _verified_prechecks(client, category="Hardware / Sensor / Device Problem"):
     """Every managed pre-ticket check for a category, all verified."""
     response = client.get(
-        "/api/support/checklist-options/",
-        data={"kind": "prechecklist", "category": category, "active_only": 1},
+        "/api/support/problem-categories/?active_only=1",
         headers={"x-user-role": "company_admin"},
     )
     assert response.status_code == 200
-    return [{"label": item["label"], "checked": True} for item in response.json()]
+    managed = next(item for item in response.json() if item["name"] == category)
+    assert managed["checklist"], "The problem category has no managed pre-ticket checks"
+    return [{"label": label, "checked": True} for label in managed["checklist"]]
 
 
 @pytest.mark.django_db

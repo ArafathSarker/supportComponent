@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, 
   Search, 
@@ -63,6 +63,31 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+
+  // Problem categories are managed dynamically in Support Ticket Management
+  const [managedCategories, setManagedCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getProblemCategories({ activeOnly: true, role: currentUser.role })
+      .then((list) => {
+        if (!cancelled) setManagedCategories(list.map((item) => item.name));
+      })
+      .catch(() => {
+        if (!cancelled) setManagedCategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser.role]);
+
+  const categoryFilterOptions = useMemo(() => {
+    if (managedCategories.length > 0) return managedCategories;
+    return categories && categories.length > 0
+      ? categories
+      : GARMENTS_IOT_CATEGORIES.map((c) => c.category);
+  }, [managedCategories, categories]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -256,7 +281,7 @@ export const SupportTickets: React.FC<SupportTicketsProps> = ({
               title="Filter by Problem Category"
             >
               <option value="All">All Categories</option>
-              {(categories && categories.length > 0 ? categories : GARMENTS_IOT_CATEGORIES.map((c) => c.category)).map((cat) => (
+              {categoryFilterOptions.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>

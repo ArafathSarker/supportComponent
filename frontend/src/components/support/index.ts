@@ -5,6 +5,7 @@ export * from './SupportTickets';
 export * from './VisitingReports';
 export * from './SupportManagement';
 export * from './EmployeePicker';
+export * from './ReasonPicker';
 export * from './ScheduleVisitModal';
 export * from './AcknowledgeVisitModal';
 export * from './RaiseTicketModal';

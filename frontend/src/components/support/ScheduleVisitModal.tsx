@@ -8,7 +8,6 @@ import {
   Phone,
   User,
   Users,
-  Plus,
   Trash2,
   CheckCircle2,
   ListTodo,
@@ -17,7 +16,6 @@ import {
   EyeOff,
   Lock,
   UserCheck,
-  ChevronDown,
   Ticket as TicketIcon,
   ClipboardCheck
 } from 'lucide-react';
@@ -32,6 +30,7 @@ import type {
 import { api } from './api';
 import { GARMENTS_FLOORS, GARMENTS_SYSTEMS } from './iotConfig';
 import { EmployeeSearchSelect, EmployeeMultiPicker } from './EmployeePicker';
+import { ReasonSearchSelect } from './ReasonPicker';
 
 interface ScheduleVisitModalProps {
   isOpen: boolean;
@@ -78,11 +77,9 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
 
   // Reason for the visit shared with the company owner (managed options)
   const [visitReasons, setVisitReasons] = useState<VisitReason[]>([]);
-  const [selectedReasonId, setSelectedReasonId] = useState('');
 
   // The confidential, provider-only reason the visit is really made for
   const [internalReasons, setInternalReasons] = useState<VisitReason[]>([]);
-  const [selectedInternalReasonId, setSelectedInternalReasonId] = useState('');
 
   // Headcount visibility toggle for the company owner
   const [showVisitorCount, setShowVisitorCount] = useState(true);
@@ -156,41 +153,32 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
     setTeamMembers((prev) => prev.filter((member) => member.id !== employeeId));
   };
 
-  const handleAddReason = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const option = visitReasonOptions.find((item) => item.id === selectedReasonId);
-    if (!option) return;
-    if (!visitReasons.some((reason) => reason.option_id === option.id)) {
-      setVisitReasons((prev) => [
-        ...prev,
-        {
-          id: `reason-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          label: option.label,
-          option_id: option.id
-        }
-      ]);
-    }
-    setSelectedReasonId('');
+  const handleAddReason = (option: ChecklistOption) => {
+    if (visitReasons.some((reason) => reason.option_id === option.id)) return;
+    setVisitReasons((prev) => [
+      ...prev,
+      {
+        id: `reason-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        label: option.label,
+        option_id: option.id
+      }
+    ]);
   };
 
   const handleRemoveReason = (id?: string) => {
     setVisitReasons((prev) => prev.filter((reason) => reason.id !== id));
   };
 
-  const handleAddInternalReason = () => {
-    const option = internalReasonOptions.find((item) => item.id === selectedInternalReasonId);
-    if (!option) return;
-    if (!internalReasons.some((reason) => reason.option_id === option.id)) {
-      setInternalReasons((prev) => [
-        ...prev,
-        {
-          id: `ireason-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          label: option.label,
-          option_id: option.id
-        }
-      ]);
-    }
-    setSelectedInternalReasonId('');
+  const handleAddInternalReason = (option: ChecklistOption) => {
+    if (internalReasons.some((reason) => reason.option_id === option.id)) return;
+    setInternalReasons((prev) => [
+      ...prev,
+      {
+        id: `ireason-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        label: option.label,
+        option_id: option.id
+      }
+    ]);
   };
 
   const handleRemoveInternalReason = (id?: string) => {
@@ -573,41 +561,17 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               factory owner; the options are maintained in Support Ticket Management.
             </p>
 
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <select
-                  value={selectedReasonId}
-                  onChange={(e) => setSelectedReasonId(e.target.value)}
-                  className="w-full appearance-none bg-white border border-slate-300 text-slate-900 rounded-lg pl-3 pr-8 py-2 text-xs focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
-                >
-                  <option value="">
-                    {visitReasonOptions.length === 0
-                      ? 'No reasons yet — add them in Support Ticket Management'
-                      : 'Select a visit reason...'}
-                  </option>
-                  {visitReasonOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.category ? `[${option.category}] ` : ''}{option.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleAddReason()}
-                disabled={!selectedReasonId}
-                className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1 shrink-0"
-              >
-                <Plus size={14} />
-                <span>Add</span>
-              </button>
-            </div>
+            <ReasonSearchSelect
+              options={visitReasonOptions}
+              selectedIds={visitReasons.map((reason) => reason.option_id || '')}
+              onSelect={handleAddReason}
+              placeholder="Search a visit reason (e.g. maintenance, network, training)..."
+            />
 
             <div className="space-y-1.5 max-h-48 overflow-y-auto pt-1">
               {visitReasons.length === 0 ? (
                 <div className="p-3 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-300">
-                  No reason selected yet. Pick one above and click Add.
+                  No reason selected yet. Search above and pick a reason to add it.
                 </div>
               ) : (
                 visitReasons.map((reason, index) => (
@@ -653,41 +617,18 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
               and are never shown to the company owner.
             </p>
 
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <select
-                  value={selectedInternalReasonId}
-                  onChange={(e) => setSelectedInternalReasonId(e.target.value)}
-                  className="w-full appearance-none bg-white border border-slate-300 text-slate-900 rounded-lg pl-3 pr-8 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm cursor-pointer"
-                >
-                  <option value="">
-                    {internalReasonOptions.length === 0
-                      ? 'No reasons yet — add them in Support Ticket Management'
-                      : 'Select a confidential reason...'}
-                  </option>
-                  {internalReasonOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.category ? `[${option.category}] ` : ''}{option.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
-              </div>
-              <button
-                type="button"
-                onClick={handleAddInternalReason}
-                disabled={!selectedInternalReasonId}
-                className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1 shrink-0"
-              >
-                <Plus size={14} />
-                <span>Add</span>
-              </button>
-            </div>
+            <ReasonSearchSelect
+              options={internalReasonOptions}
+              selectedIds={internalReasons.map((reason) => reason.option_id || '')}
+              onSelect={handleAddInternalReason}
+              placeholder="Search a confidential reason..."
+              confidential
+            />
 
             <div className="space-y-1.5 max-h-44 overflow-y-auto">
               {internalReasons.length === 0 ? (
                 <div className="p-3 text-center text-[11px] text-purple-700/60 bg-white rounded-lg border border-dashed border-purple-200">
-                  No confidential reason added yet.
+                  No confidential reason added yet. Search above and pick a reason to add it.
                 </div>
               ) : (
                 internalReasons.map((reason, index) => (

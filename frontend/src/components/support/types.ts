@@ -14,13 +14,29 @@ export interface SupportEmployee {
   updated_at?: string;
 }
 
-export type ChecklistOptionKind = 'visit_reason' | 'internal_reason' | 'prechecklist';
+export type ChecklistOptionKind = 'visit_reason' | 'internal_reason';
 
 export interface ChecklistOption {
   id: string;
   kind: ChecklistOptionKind;
   label: string;
   category?: string;
+  sort_order?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * A support-ticket problem category managed in Support Ticket Management.
+ * Its pre-ticket checklist is stored in the database (jsonb on PostgreSQL), so
+ * categories and their checks are added without a code change.
+ */
+export interface ProblemCategory {
+  id: string;
+  name: string;
+  description?: string;
+  checklist: string[];
   sort_order?: number;
   is_active?: boolean;
   created_at?: string;

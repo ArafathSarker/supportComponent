@@ -100,6 +100,13 @@ def test_checklist_options_crud_and_permissions(client):
     assert listing.status_code == 200
     assert any(item["id"] == option["id"] for item in listing.json())
 
+    # Visit and confidential reasons stay provider-only
+    company_listing = client.get(
+        "/api/support/checklist-options/?kind=visit_reason",
+        headers={"x-user-role": "company_admin"},
+    )
+    assert company_listing.status_code == 403
+
     updated = client.patch(
         f"/api/support/checklist-options/{option['id']}/",
         data={"is_active": False},
@@ -232,12 +239,12 @@ PRECHECK_CATEGORY = "Hardware / Sensor / Device Problem"
 def _category_prechecks(client, category=PRECHECK_CATEGORY):
     """Company-readable pre-ticket checks managed for a problem category."""
     response = client.get(
-        "/api/support/checklist-options/",
-        data={"kind": "prechecklist", "category": category, "active_only": 1},
+        "/api/support/problem-categories/?active_only=1",
         headers={"x-user-role": "company_admin"},
     )
     assert response.status_code == 200
-    return response.json()
+    managed = next(item for item in response.json() if item["name"] == category)
+    return managed["checklist"]
 
 
 @pytest.mark.django_db
@@ -261,8 +268,8 @@ def test_prechecklist_must_be_verified_before_raising_a_ticket(client):
         data={
             **base_payload,
             "prechecklist": [
-                {"label": prechecks[0]["label"], "checked": True},
-                {"label": prechecks[1]["label"], "checked": False},
+                {"label": prechecks[0], "checked": True},
+                {"label": prechecks[1], "checked": False},
             ],
         },
         headers={"x-user-role": "company_admin"},
@@ -277,7 +284,7 @@ def test_prechecklist_must_be_verified_before_raising_a_ticket(client):
         data={
             **base_payload,
             "prechecklist": [
-                {"label": item["label"], "checked": True} for item in prechecks
+                {"label": item, "checked": True} for item in prechecks
             ],
         },
         headers={"x-user-role": "company_admin"},
@@ -287,6 +294,126 @@ def test_prechecklist_must_be_verified_before_raising_a_ticket(client):
     ticket = complete.json()
     assert len(ticket["prechecklist"]) == len(prechecks)
     assert all(item["checked"] for item in ticket["prechecklist"])
+
+
+@pytest.mark.django_db
+def test_problem_categories_are_dynamic_and_guard_ticket_creation(client):
+    """Categories and their pre-ticket checks are managed data, not code."""
+    created = client.post(
+        "/api/support/problem-categories/",
+        data={
+            "name": "Custom Sensor Drift",
+            "description": "Slowly drifting analog readings",
+            "checklist": [
+                "Recalibrated the sensor zero offset",
+                "   ",
+                "Recalibrated the sensor zero offset",
+                "Replaced the signal cable",
+            ],
+            "sort_order": 5,
+        },
+        headers={"x-user-role": "super_admin"},
+        format="json",
+    )
+    assert created.status_code == 201
+    category = created.json()
+    assert category["checklist"] == [
+        "Recalibrated the sensor zero offset",
+        "Replaced the signal cable",
+    ]
+    category_id = category["id"]
+
+    # The company reads categories to raise tickets, but cannot maintain them
+    listing = client.get(
+        "/api/support/problem-categories/?active_only=1",
+        headers={"x-user-role": "company_admin"},
+    )
+    assert listing.status_code == 200
+    assert any(item["id"] == category_id for item in listing.json())
+
+    forbidden = client.post(
+        "/api/support/problem-categories/",
+        data={"name": "Company cannot add this", "checklist": ["Anything"]},
+        headers={"x-user-role": "company_admin"},
+        format="json",
+    )
+    assert forbidden.status_code == 403
+
+    duplicate = client.post(
+        "/api/support/problem-categories/",
+        data={"name": "Custom Sensor Drift", "checklist": ["Anything"]},
+        headers={"x-user-role": "super_admin"},
+        format="json",
+    )
+    assert duplicate.status_code == 400
+
+    base_payload = {
+        "title": "Analog reading drifts every shift",
+        "affected_system": "Boiler SCADA",
+        "category": "Custom Sensor Drift",
+        "description": "The pressure reading drifts by 0.4 bar per shift.",
+        "company_name": "CSI Smart Tech Ltd",
+        "created_by_name": "Arafath",
+        "created_by_role": "company_admin",
+    }
+
+    incomplete = client.post(
+        "/api/tickets/",
+        data={
+            **base_payload,
+            "prechecklist": [
+                {"label": "Recalibrated the sensor zero offset", "checked": True}
+            ],
+        },
+        headers={"x-user-role": "company_admin"},
+        format="json",
+    )
+    assert incomplete.status_code == 400
+    assert "prechecklist" in incomplete.json()
+
+    complete = client.post(
+        "/api/tickets/",
+        data={
+            **base_payload,
+            "prechecklist": [
+                {"label": label, "checked": True} for label in category["checklist"]
+            ],
+        },
+        headers={"x-user-role": "company_admin"},
+        format="json",
+    )
+    assert complete.status_code == 201
+    assert len(complete.json()["prechecklist"]) == 2
+
+    # Editing the managed checklist immediately changes what a new ticket needs
+    updated = client.patch(
+        f"/api/support/problem-categories/{category_id}/",
+        data={"checklist": category["checklist"] + ["Captured a raw telemetry snapshot"]},
+        headers={"x-user-role": "super_admin"},
+        format="json",
+    )
+    assert updated.status_code == 200
+    assert updated.json()["checklist"][-1] == "Captured a raw telemetry snapshot"
+
+    stale = client.post(
+        "/api/tickets/",
+        data={
+            **base_payload,
+            "prechecklist": [
+                {"label": label, "checked": True} for label in category["checklist"]
+            ],
+        },
+        headers={"x-user-role": "company_admin"},
+        format="json",
+    )
+    assert stale.status_code == 400
+    assert "Captured a raw telemetry snapshot" in str(stale.json()["prechecklist"])
+
+    deleted = client.delete(
+        f"/api/support/problem-categories/{category_id}/",
+        headers={"x-user-role": "super_admin"},
+    )
+    assert deleted.status_code == 204
 
 
 @pytest.mark.django_db
@@ -305,7 +432,7 @@ def test_visit_prechecklist_audit_is_super_admin_only(client):
             "created_by_name": "Arafath",
             "created_by_role": "company_admin",
             "prechecklist": [
-                {"label": item["label"], "checked": True} for item in prechecks
+                {"label": item, "checked": True} for item in prechecks
             ],
         },
         headers={"x-user-role": "company_admin"},
@@ -345,7 +472,7 @@ def test_visit_prechecklist_audit_is_super_admin_only(client):
     audit = [
         {
             "id": f"pre-{index}",
-            "task": item["label"],
+            "task": item,
             "status": "flagged" if index == 0 else "acknowledged",
         }
         for index, item in enumerate(prechecks)

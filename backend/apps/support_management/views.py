@@ -4,8 +4,12 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import SupportEmployee, ChecklistOption
-from .serializers import SupportEmployeeSerializer, ChecklistOptionSerializer
+from .models import SupportEmployee, ChecklistOption, ProblemCategory
+from .serializers import (
+    SupportEmployeeSerializer,
+    ChecklistOptionSerializer,
+    ProblemCategorySerializer,
+)
 
 
 def _resolve_role(request) -> str:
@@ -92,21 +96,16 @@ class SupportEmployeeDetailView(APIView):
 
 class ChecklistOptionListCreateView(APIView):
     """
-    GET  /api/support/checklist-options/ - List managed options
-    POST /api/support/checklist-options/ - Add a new option (Super Admin only)
+    GET  /api/support/checklist-options/ - List managed visit reasons
+    POST /api/support/checklist-options/ - Add a new reason (Super Admin only)
 
-    Visit reasons and confidential reasons are provider-only. Problem category
-    pre-ticket checks are readable by the company, because they must verify them
-    before raising a ticket.
+    Visit reasons and confidential reasons are provider-only. The company reads
+    the problem categories (and their pre-ticket checks) instead, because those
+    must be verified before raising a ticket.
     """
     def get(self, request):
-        role = _resolve_role(request)
+        _require_super_admin(request)
         kind = (request.query_params.get('kind') or '').strip()
-
-        if role != 'super_admin' and kind != ChecklistOption.KIND_PRECHECKLIST:
-            raise PermissionDenied(
-                'Only Super Admin (Solution Provider) can view visit reasons.'
-            )
 
         queryset = ChecklistOption.objects.all()
 
@@ -165,4 +164,65 @@ class ChecklistOptionDetailView(APIView):
         _require_super_admin(request)
         option = self._get_option(option_id)
         option.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProblemCategoryListCreateView(APIView):
+    """
+    GET  /api/support/problem-categories/ - List problem categories with their checklists
+    POST /api/support/problem-categories/ - Add a problem category (Super Admin only)
+
+    Categories and their checklists are read by the company while raising a
+    ticket, but only the Solution Provider can maintain them.
+    """
+    def get(self, request):
+        queryset = ProblemCategory.objects.all()
+
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(description__icontains=search)
+            )
+
+        if _is_truthy(request.query_params.get('active_only')):
+            queryset = queryset.filter(is_active=True)
+
+        serializer = ProblemCategorySerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        _require_super_admin(request)
+        serializer = ProblemCategorySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ProblemCategoryDetailView(APIView):
+    """
+    GET/PATCH/DELETE /api/support/problem-categories/<category_id>/
+    """
+    def _get_category(self, category_id):
+        category = ProblemCategory.objects.filter(id=category_id).first()
+        if not category:
+            from rest_framework.exceptions import NotFound
+            raise NotFound(f"Problem category '{category_id}' not found.")
+        return category
+
+    def get(self, request, category_id):
+        category = self._get_category(category_id)
+        return Response(ProblemCategorySerializer(category).data)
+
+    def patch(self, request, category_id):
+        _require_super_admin(request)
+        category = self._get_category(category_id)
+        serializer = ProblemCategorySerializer(category, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, category_id):
+        _require_super_admin(request)
+        category = self._get_category(category_id)
+        category.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

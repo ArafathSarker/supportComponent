@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Upload, Loader2, AlertCircle, Edit3, MapPin, Zap, CheckSquare, Square, ListChecks } from 'lucide-react';
-import type { Ticket, TicketUrgency, CurrentUser, TicketPriority } from './types';
+import type { Ticket, TicketUrgency, CurrentUser, TicketPriority, ProblemCategory } from './types';
 import { api } from './api';
 import { 
-  GARMENTS_IOT_CATEGORIES, 
   GARMENTS_SYSTEMS, 
   GARMENTS_FLOORS, 
   PRODUCTION_IMPACTS 
@@ -24,18 +23,17 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
   onClose,
   ticket,
   currentUser,
-  categories,
   systems,
   onTicketUpdated
 }) => {
   const systemOptions = systems && systems.length > 0 ? systems : GARMENTS_SYSTEMS;
-  const categoryOptions = categories && categories.length > 0 
-    ? categories 
-    : GARMENTS_IOT_CATEGORIES.map((c) => c.category);
+
+  // Problem categories and their checklists are managed in Support Ticket Management.
+  const [categoryList, setCategoryList] = useState<ProblemCategory[]>([]);
 
   const [title, setTitle] = useState('');
   const [affectedSystem, setAffectedSystem] = useState(systemOptions[0]);
-  const [category, setCategory] = useState(categoryOptions[0]);
+  const [category, setCategory] = useState('');
   const [priority, setPriority] = useState<TicketPriority>('Medium');
   const [productionImpact, setProductionImpact] = useState(PRODUCTION_IMPACTS[0]);
   const [lineNumber, setLineNumber] = useState('');
@@ -43,16 +41,16 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
   const [description, setDescription] = useState('');
   const [checkedItems, setCheckedItems] = useState<string[]>([]);
 
-  // Category pre-checklist
-  const selectedCategoryConfig = GARMENTS_IOT_CATEGORIES.find(
-    (c) => c.category.toLowerCase() === category.toLowerCase()
-  );
-  const preChecklist = selectedCategoryConfig?.troubleshootingChecklist || [
-    'Cleaned and inspected physical sensor/equipment',
-    'Checked auxiliary power adapter and LED indicator',
-    'Verified harness connections are secure',
-    'Performed a 30-second restart/power-cycle'
-  ];
+  // Keep the ticket's own category selectable even if it was retired from management
+  const categoryOptions = useMemo(() => {
+    const names = categoryList.map((item) => item.name);
+    if (category && !names.includes(category)) return [category, ...names];
+    return names;
+  }, [categoryList, category]);
+
+  const selectedCategory =
+    categoryList.find((item) => item.name === category) || null;
+  const preChecklist = selectedCategory?.checklist || [];
 
   const toggleChecklistItem = (item: string) => {
     setCheckedItems((prev) =>
@@ -64,12 +62,31 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Load the dynamically managed problem categories when the modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+
+    api
+      .getProblemCategories({ activeOnly: true, role: currentUser.role })
+      .then((list) => {
+        if (!cancelled) setCategoryList(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCategoryList([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, currentUser.role]);
+
   // Sync state whenever the selected ticket changes or modal opens
   useEffect(() => {
     if (ticket) {
       setTitle(ticket.title || '');
       setAffectedSystem(ticket.affected_system || systemOptions[0]);
-      setCategory(ticket.category || categoryOptions[0]);
+      setCategory(ticket.category || '');
       setPriority((ticket.priority || ticket.urgency || 'Medium') as TicketPriority);
       setProductionImpact(ticket.production_impact || PRODUCTION_IMPACTS[0]);
       setLineNumber(ticket.line_number || '');
@@ -209,12 +226,19 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
               <label className="text-xs font-semibold text-slate-700">Problem Category</label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setCheckedItems([]);
+                }}
                 className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
               >
-                {categoryOptions.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
+                {categoryOptions.length === 0 ? (
+                  <option value="">No managed categories yet</option>
+                ) : (
+                  categoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))
+                )}
               </select>
             </div>
           </div>
@@ -236,6 +260,11 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
             </p>
 
             <div className="space-y-1.5 pt-1">
+              {preChecklist.length === 0 && (
+                <div className="p-3 text-center text-[11px] text-slate-500 bg-white rounded-lg border border-dashed border-slate-300">
+                  This problem category has no managed pre-ticket checks yet.
+                </div>
+              )}
               {preChecklist.map((item, idx) => {
                 const isChecked = checkedItems.includes(item);
                 return (

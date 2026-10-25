@@ -1,4 +1,4 @@
-import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport, TicketUrgency, TicketPriority, TicketWorkspacePayload, SupportEmployee, ChecklistOption, VisitingTeamMember } from './types';
+import type { Ticket, TicketStats, TicketMessage, UserRole, VisitingReport, TicketUrgency, TicketPriority, TicketWorkspacePayload, SupportEmployee, ChecklistOption, ProblemCategory, VisitingTeamMember } from './types';
 
 const getDefaultApiBase = (): string => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
@@ -447,6 +447,70 @@ export class SupportApiClient {
       headers: { 'x-user-role': 'super_admin' },
     });
     if (!res.ok) throw new Error('Failed to remove checklist option');
+  }
+
+  // Problem categories and their dynamic pre-ticket checklists
+  async getProblemCategories(options?: {
+    search?: string;
+    activeOnly?: boolean;
+    role?: UserRole;
+  }): Promise<ProblemCategory[]> {
+    const params = new URLSearchParams();
+    if (options?.search) params.append('search', options.search);
+    if (options?.activeOnly) params.append('active_only', '1');
+
+    const res = await fetch(`${this.apiBase}/support/problem-categories/?${params.toString()}`, {
+      headers: { 'x-user-role': options?.role || 'super_admin' },
+    });
+    if (!res.ok) throw new Error('Failed to load problem categories');
+    return res.json();
+  }
+
+  async createProblemCategory(payload: {
+    name: string;
+    description?: string;
+    checklist: string[];
+    sort_order?: number;
+    is_active?: boolean;
+  }): Promise<ProblemCategory> {
+    const res = await fetch(`${this.apiBase}/support/problem-categories/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-role': 'super_admin' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        err.detail ||
+        err.name?.[0] ||
+        'Failed to add problem category. The name may already exist.'
+      );
+    }
+    return res.json();
+  }
+
+  async updateProblemCategory(
+    categoryId: string,
+    payload: Partial<ProblemCategory>
+  ): Promise<ProblemCategory> {
+    const res = await fetch(`${this.apiBase}/support/problem-categories/${categoryId}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-role': 'super_admin' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.name?.[0] || 'Failed to update problem category');
+    }
+    return res.json();
+  }
+
+  async deleteProblemCategory(categoryId: string): Promise<void> {
+    const res = await fetch(`${this.apiBase}/support/problem-categories/${categoryId}/`, {
+      method: 'DELETE',
+      headers: { 'x-user-role': 'super_admin' },
+    });
+    if (!res.ok) throw new Error('Failed to remove problem category');
   }
 
   // Visiting Reports API methods

@@ -13,9 +13,16 @@ import {
   ShieldCheck,
   Phone,
   X,
-  Lock
+  Lock,
+  Plus,
+  ClipboardList
 } from 'lucide-react';
-import type { SupportEmployee, ChecklistOption, ChecklistOptionKind } from './types';
+import type {
+  SupportEmployee,
+  ChecklistOption,
+  ChecklistOptionKind,
+  ProblemCategory
+} from './types';
 import { api } from './api';
 
 interface SupportManagementProps {
@@ -42,22 +49,30 @@ const emptyOptionForm = {
 const OPTION_KIND_LABELS: Record<ChecklistOptionKind, string> = {
   visit_reason: 'Reason for visit (client visible)',
   internal_reason: 'Confidential reason',
-  prechecklist: 'Problem category pre-check',
 };
 
 const OPTION_KIND_STYLES: Record<ChecklistOptionKind, string> = {
   visit_reason: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   internal_reason: 'bg-purple-50 text-purple-700 border-purple-200',
-  prechecklist: 'bg-amber-50 text-amber-700 border-amber-200',
+};
+
+const emptyCategoryForm = {
+  name: '',
+  description: '',
+  checklist: [''],
+  sort_order: 0,
+  is_active: true,
 };
 
 export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdmin = true }) => {
   const [employees, setEmployees] = useState<SupportEmployee[]>([]);
   const [options, setOptions] = useState<ChecklistOption[]>([]);
+  const [categories, setCategories] = useState<ProblemCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [optionSearch, setOptionSearch] = useState('');
   const [optionKindFilter, setOptionKindFilter] = useState<'all' | ChecklistOptionKind>('all');
+  const [categorySearch, setCategorySearch] = useState('');
 
   const [employeeForm, setEmployeeForm] = useState({ ...emptyEmployeeForm });
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
@@ -69,15 +84,22 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
   const [savingOption, setSavingOption] = useState(false);
   const [optionError, setOptionError] = useState<string | null>(null);
 
+  const [categoryForm, setCategoryForm] = useState({ ...emptyCategoryForm });
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [employeeList, optionList] = await Promise.all([
+      const [employeeList, optionList, categoryList] = await Promise.all([
         api.getSupportEmployees(),
         api.getChecklistOptions(),
+        api.getProblemCategories(),
       ]);
       setEmployees(employeeList);
       setOptions(optionList);
+      setCategories(categoryList);
     } catch (err: any) {
       setEmployeeError(err.message || 'Failed to load support management data.');
     } finally {
@@ -126,6 +148,16 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
     acc[option.kind] = (acc[option.kind] || 0) + 1;
     return acc;
   }, {});
+
+  const filteredCategories = categories.filter((category) => {
+    const q = categorySearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      category.name.toLowerCase().includes(q) ||
+      (category.description || '').toLowerCase().includes(q) ||
+      (category.checklist || []).some((item) => item.toLowerCase().includes(q))
+    );
+  });
 
   const leadEmployeeCount = employees.filter((employee) => employee.is_lead_engineer).length;
 
@@ -284,6 +316,113 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
     }
   };
 
+  // ------------------------------------------------------- Problem categories
+  const updateChecklistRow = (index: number, value: string) => {
+    setCategoryForm((prev) => ({
+      ...prev,
+      checklist: prev.checklist.map((item, i) => (i === index ? value : item)),
+    }));
+  };
+
+  const addChecklistRow = () => {
+    setCategoryForm((prev) => ({ ...prev, checklist: [...prev.checklist, ''] }));
+  };
+
+  const removeChecklistRow = (index: number) => {
+    setCategoryForm((prev) => ({
+      ...prev,
+      checklist:
+        prev.checklist.length === 1
+          ? ['']
+          : prev.checklist.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = categoryForm.name.trim();
+    const checklist = categoryForm.checklist.map((item) => item.trim()).filter(Boolean);
+
+    if (!name) {
+      setCategoryError('Problem category name is required.');
+      return;
+    }
+    if (checklist.length === 0) {
+      setCategoryError('Add at least one pre-ticket check for this category.');
+      return;
+    }
+
+    try {
+      setSavingCategory(true);
+      setCategoryError(null);
+      const payload = {
+        name,
+        description: categoryForm.description.trim(),
+        checklist,
+        sort_order: categoryForm.sort_order,
+        is_active: categoryForm.is_active,
+      };
+
+      if (editingCategoryId) {
+        const updated = await api.updateProblemCategory(editingCategoryId, payload);
+        setCategories((prev) =>
+          prev.map((item) => (item.id === updated.id ? updated : item))
+        );
+      } else {
+        const created = await api.createProblemCategory(payload);
+        setCategories((prev) =>
+          [...prev, created].sort(
+            (a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name)
+          )
+        );
+      }
+      setCategoryForm({ ...emptyCategoryForm });
+      setEditingCategoryId(null);
+    } catch (err: any) {
+      setCategoryError(err.message || 'Failed to save problem category.');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleEditCategory = (category: ProblemCategory) => {
+    setEditingCategoryId(category.id);
+    setCategoryError(null);
+    setCategoryForm({
+      name: category.name,
+      description: category.description || '',
+      checklist: category.checklist.length > 0 ? [...category.checklist] : [''],
+      sort_order: category.sort_order || 0,
+      is_active: category.is_active !== false,
+    });
+  };
+
+  const handleDeleteCategory = async (category: ProblemCategory) => {
+    if (!window.confirm(`Delete the problem category "${category.name}"?`)) return;
+    try {
+      setCategoryError(null);
+      await api.deleteProblemCategory(category.id);
+      setCategories((prev) => prev.filter((item) => item.id !== category.id));
+      if (editingCategoryId === category.id) {
+        setEditingCategoryId(null);
+        setCategoryForm({ ...emptyCategoryForm });
+      }
+    } catch (err: any) {
+      setCategoryError(err.message || 'Failed to remove problem category.');
+    }
+  };
+
+  const toggleCategoryActive = async (category: ProblemCategory) => {
+    try {
+      const updated = await api.updateProblemCategory(category.id, {
+        is_active: !(category.is_active !== false),
+      });
+      setCategories((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (err: any) {
+      setCategoryError(err.message || 'Failed to update category status.');
+    }
+  };
+
   return (
     <div className="w-full space-y-5">
       {/* Page Header */}
@@ -298,7 +437,8 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
               Maintain the support employee directory, the visit reasons shared with clients, the
-              confidential reasons for a visit, and the pre-ticket checks for each problem category.
+              confidential reasons for a visit, and the dynamic problem categories with the
+              pre-ticket checks a ticket must satisfy.
             </p>
           </div>
         </div>
@@ -314,6 +454,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
           Loading support management data...
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
           {/* ------------------------------------------------ Employee Directory */}
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -590,18 +731,13 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
 
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-700">
-                  {optionForm.kind === 'prechecklist' ? 'Pre-Check Item' : 'Reason'}{' '}
-                  <span className="text-red-500">*</span>
+                  Reason <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={optionForm.label}
                   onChange={(e) => setOptionForm((prev) => ({ ...prev, label: e.target.value }))}
-                  placeholder={
-                    optionForm.kind === 'prechecklist'
-                      ? 'e.g. Cleaned the sensor lens before raising the ticket'
-                      : 'e.g. Scheduled preventive maintenance of IoT hardware'
-                  }
+                  placeholder="e.g. Scheduled preventive maintenance of IoT hardware"
                   className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm"
                   required
                 />
@@ -609,18 +745,12 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-slate-700">
-                    {optionForm.kind === 'prechecklist' ? 'Problem Category' : 'Category'}
-                  </label>
+                  <label className="text-[11px] font-semibold text-slate-700">Category</label>
                   <input
                     type="text"
                     value={optionForm.category}
                     onChange={(e) => setOptionForm((prev) => ({ ...prev, category: e.target.value }))}
-                    placeholder={
-                      optionForm.kind === 'prechecklist'
-                        ? 'e.g. Hardware / Sensor / Device Problem'
-                        : 'e.g. Maintenance'
-                    }
+                    placeholder="e.g. Maintenance"
                     className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 shadow-sm"
                   />
                 </div>
@@ -674,7 +804,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
 
             <div className="p-4 space-y-2.5">
               <div className="flex flex-wrap items-center gap-1.5">
-                {(['all', 'visit_reason', 'internal_reason', 'prechecklist'] as const).map((kind) => (
+                {(['all', 'visit_reason', 'internal_reason'] as const).map((kind) => (
                   <button
                     key={kind}
                     type="button"
@@ -736,7 +866,7 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
                               {OPTION_KIND_LABELS[option.kind] || option.kind}
                             </span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                              {option.kind === 'prechecklist' ? 'Category: ' : ''}{option.category || 'General'}
+                              {option.category || 'General'}
                             </span>
                             <span className="text-[10px] text-slate-400">
                               Sort #{option.sort_order || 0}
@@ -787,6 +917,264 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ isSuperAdm
             </div>
           </div>
         </div>
+
+        {/* ------------------------------------------- Problem Categories */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-200 bg-amber-50/50 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <ClipboardList size={16} className="text-amber-600" />
+              <h3 className="text-sm font-bold text-slate-900">
+                Problem Categories & Pre-Ticket Checks
+              </h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                {categories.length}
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-500">
+              Used by Raise Support Ticket • checklist stored as JSONB
+            </span>
+          </div>
+
+          <form onSubmit={handleCategorySubmit} className="p-4 space-y-3 border-b border-slate-100 bg-slate-50/30">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+              <ClipboardList size={13} className="text-amber-600" />
+              {editingCategoryId ? 'Edit problem category' : 'Add problem category'}
+            </div>
+
+            {categoryError && (
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-[11px] flex items-start gap-2">
+                <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                <span>{categoryError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-[11px] font-semibold text-slate-700">
+                  Category Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={categoryForm.name}
+                  onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Chiller Telemetry / Temperature Probe Fault"
+                  className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500 shadow-sm"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-slate-700">Sort Order</label>
+                <input
+                  type="number"
+                  value={categoryForm.sort_order}
+                  onChange={(e) =>
+                    setCategoryForm((prev) => ({ ...prev, sort_order: Number(e.target.value) || 0 }))
+                  }
+                  className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500 shadow-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-slate-700">Short Description</label>
+              <input
+                type="text"
+                value={categoryForm.description}
+                onChange={(e) => setCategoryForm((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="e.g. Temperature, humidity and chiller performance telemetry"
+                className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500 shadow-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-700">
+                  Pre-Ticket Checks <span className="text-red-500">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400">
+                  {categoryForm.checklist.filter((item) => item.trim()).length} check item(s)
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                The company must verify every item before it can raise a ticket in this category.
+              </p>
+
+              <div className="space-y-1.5">
+                {categoryForm.checklist.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="w-5 h-5 shrink-0 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[10px] flex items-center justify-center">
+                      {index + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={item}
+                      onChange={(e) => updateChecklistRow(index, e.target.value)}
+                      placeholder="e.g. Cleared lint from the optical sensor lens"
+                      className="flex-1 bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500 shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeChecklistRow(index)}
+                      className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                      title="Remove check item"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addChecklistRow}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center gap-1"
+              >
+                <Plus size={12} />
+                Add check item
+              </button>
+            </div>
+
+            <label className="flex items-center gap-2 text-[11px] font-medium text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={categoryForm.is_active}
+                onChange={(e) => setCategoryForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              Available when raising a ticket
+            </label>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={savingCategory}
+                className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 transition-colors shadow-sm flex items-center gap-1.5"
+              >
+                {savingCategory ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <ClipboardList size={13} />
+                )}
+                <span>{editingCategoryId ? 'Save Changes' : 'Add Category'}</span>
+              </button>
+              {editingCategoryId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCategoryId(null);
+                    setCategoryForm({ ...emptyCategoryForm });
+                    setCategoryError(null);
+                  }}
+                  className="px-3 py-2 rounded-lg text-xs font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+
+          <div className="p-4 space-y-2.5">
+            <div className="relative flex items-center">
+              <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+                placeholder="Search categories or their check items..."
+                className="w-full bg-slate-50 border border-slate-300 text-slate-800 pl-8 pr-3 py-2 rounded-lg text-xs focus:bg-white focus:outline-none focus:border-amber-500 shadow-sm"
+              />
+              {categorySearch && (
+                <button
+                  type="button"
+                  onClick={() => setCategorySearch('')}
+                  className="absolute right-2.5 p-0.5 rounded text-slate-400 hover:text-slate-700"
+                  title="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {filteredCategories.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl md:col-span-2">
+                  No problem categories found. Add one above so it appears when raising a ticket.
+                </div>
+              ) : (
+                filteredCategories.map((category) => (
+                  <div
+                    key={category.id}
+                    className={`p-3 rounded-xl border transition-colors ${category.is_active === false
+                      ? 'bg-slate-50 border-slate-200 opacity-70'
+                      : 'bg-white border-slate-200 hover:border-amber-200'
+                      }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900">{category.name}</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                            {category.checklist.length} check{category.checklist.length === 1 ? '' : 's'}
+                          </span>
+                          {category.is_active === false && (
+                            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                              Hidden
+                            </span>
+                          )}
+                        </div>
+                        {category.description && (
+                          <p className="text-[11px] text-slate-500 mt-0.5">{category.description}</p>
+                        )}
+                        <ul className="mt-1.5 space-y-1">
+                          {category.checklist.map((item, index) => (
+                            <li
+                              key={index}
+                              className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-snug"
+                            >
+                              <span className="text-amber-600 shrink-0">•</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => toggleCategoryActive(category)}
+                          title={category.is_active === false ? 'Enable category' : 'Disable category'}
+                          className={`p-1.5 rounded-lg border transition-colors ${category.is_active === false
+                            ? 'text-slate-400 border-slate-200 hover:text-emerald-600 hover:bg-emerald-50'
+                            : 'text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
+                            }`}
+                        >
+                          {category.is_active === false ? <XCircle size={13} /> : <CheckCircle2 size={13} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEditCategory(category)}
+                          title="Edit category and checks"
+                          className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(category)}
+                          title="Delete category"
+                          className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+        </>
       )}
     </div>
   );

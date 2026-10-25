@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import SupportEmployee, ChecklistOption
+from .models import SupportEmployee, ChecklistOption, ProblemCategory
 
 
 @admin.register(SupportEmployee)
@@ -13,7 +13,15 @@ class SupportEmployeeAdmin(admin.ModelAdmin):
 
 @admin.register(ChecklistOption)
 class ChecklistOptionAdmin(admin.ModelAdmin):
-    list_display = ['label', 'category', 'sort_order', 'is_active']
-    list_filter = ['is_active', 'category']
+    list_display = ['label', 'kind', 'category', 'sort_order', 'is_active']
+    list_filter = ['is_active', 'kind', 'category']
     search_fields = ['label', 'category']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+
+
+@admin.register(ProblemCategory)
+class ProblemCategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'sort_order', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['name', 'description']
     readonly_fields = ['id', 'created_at', 'updated_at']

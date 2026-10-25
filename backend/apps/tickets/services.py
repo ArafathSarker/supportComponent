@@ -82,18 +82,23 @@ class TicketService:
         """
         Build the problem-category pre-ticket checklist for a ticket.
 
-        Items are managed per problem category in Support Ticket Management and
-        must all be verified before a ticket can be issued.
+        Categories and their check items are managed in Support Ticket
+        Management and stored in the category's JSON (`jsonb`) checklist
+        column, so a newly configured category immediately guards ticket
+        creation. Every managed check must be verified before a ticket is issued.
         """
-        from apps.support_management.models import ChecklistOption
+        from apps.support_management.models import ProblemCategory
 
-        managed = list(
-            ChecklistOption.objects.filter(
-                kind=ChecklistOption.KIND_PRECHECKLIST,
-                category=category,
-                is_active=True,
-            ).order_by('sort_order', 'label')
-        )
+        managed = []
+        category_obj = ProblemCategory.objects.filter(
+            name__iexact=(category or '').strip(), is_active=True
+        ).first()
+        if category_obj and isinstance(category_obj.checklist, list):
+            managed = [
+                item.strip()
+                for item in category_obj.checklist
+                if isinstance(item, str) and item.strip()
+            ]
 
         checked = set()
         checked_order = []
@@ -121,8 +126,8 @@ class TicketService:
 
         if managed:
             entries = [
-                {'label': option.label, 'checked': option.label in checked}
-                for option in managed
+                {'label': label, 'checked': label in checked}
+                for label in managed
             ]
             missing = [entry['label'] for entry in entries if not entry['checked']]
             if missing:

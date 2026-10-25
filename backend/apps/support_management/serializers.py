@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import SupportEmployee, ChecklistOption
+from .models import SupportEmployee, ChecklistOption, ProblemCategory
 
 
 class SupportEmployeeSerializer(serializers.ModelSerializer):
@@ -53,13 +53,43 @@ class ChecklistOptionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Option label is required.')
         return value
 
-    def validate(self, attrs):
-        kind = attrs.get('kind', getattr(self.instance, 'kind', ChecklistOption.KIND_VISIT_REASON))
-        category = attrs.get(
-            'category', getattr(self.instance, 'category', 'General')
-        )
-        if kind == ChecklistOption.KIND_PRECHECKLIST and not (category or '').strip():
-            raise serializers.ValidationError(
-                {'category': 'A problem category is required for pre-ticket check items.'}
-            )
-        return attrs
+
+class ProblemCategorySerializer(serializers.ModelSerializer):
+    """A problem category together with its dynamic pre-ticket checklist."""
+
+    class Meta:
+        model = ProblemCategory
+        fields = [
+            'id',
+            'name',
+            'description',
+            'checklist',
+            'sort_order',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_name(self, value):
+        value = (value or '').strip()
+        if not value:
+            raise serializers.ValidationError('Problem category name is required.')
+        return value
+
+    def validate_checklist(self, value):
+        if value in (None, ''):
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError('Checklist must be a list of check items.')
+
+        cleaned = []
+        for item in value:
+            if isinstance(item, dict):
+                item = item.get('label') or item.get('task')
+            if not isinstance(item, str):
+                raise serializers.ValidationError('Every check item must be text.')
+            item = item.strip()
+            if item and item not in cleaned:
+                cleaned.append(item)
+        return cleaned

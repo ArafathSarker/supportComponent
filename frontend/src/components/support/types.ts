@@ -163,6 +163,8 @@ export interface VisitReason {
   id?: string;
   label: string;
   option_id?: string;
+  is_resolved?: boolean | null;
+  client_is_resolved?: boolean | null;
 }
 
 /** A problem-category pre-ticket check the company must verify before raising a ticket. */

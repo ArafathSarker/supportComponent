@@ -70,15 +70,23 @@ def test_visiting_report_workflow(client):
     assert ack_res.json()["host_name"] == "Mr. Rafiq (Factory Maintenance Lead)"
     assert ack_res.json()["host_phone"] == "+880 1700-000000"
 
-    # 4. Super Admin completes the visit
+    # 4. Super Admin completes the visit with individual reason verdicts and welcoming person
     comp_res = client.post(
         f"/api/visiting/{visit_id}/complete/",
         data={
             "service_summary": "Thermal imaging audit finished without anomalies. Probes calibrated.",
+            "completed_by": "Engr. Rezaul Karim",
+            "host_name": "Engr. Jamir (Welcoming Lead)",
+            "host_phone": "+880 1811-111111",
+            "visit_reasons": [
+                {"id": "r-1", "label": "Recurring telemetry / sensor fault investigation", "is_resolved": True}
+            ],
+            "internal_visit_reasons": [
+                {"id": "ir-1", "label": "Assess whether the reported fault was actually a simple user-side issue", "is_resolved": False}
+            ],
             "prechecklist_audit": [
                 {"id": "pre-1", "task": "Cleaned optical sensor lens", "status": "unverified"}
             ],
-            "is_resolved": True,
             "resolution_notes": "Probe drift corrected and verified against the reference gauge.",
         },
         headers={"x-user-role": "super_admin"},
@@ -86,23 +94,28 @@ def test_visiting_report_workflow(client):
     )
     assert comp_res.status_code == 200
     assert comp_res.json()["status"] == "Completed"
-    assert comp_res.json()["is_resolved"] is True
+    assert comp_res.json()["visit_reasons"][0]["is_resolved"] is True
+    assert comp_res.json()["internal_visit_reasons"][0]["is_resolved"] is False
+    assert comp_res.json()["host_name"] == "Engr. Jamir (Welcoming Lead)"
     assert "Probe drift" in comp_res.json()["resolution_notes"]
     assert "audit finished" in comp_res.json()["service_summary"]
 
-    # 5. Company Admin confirms resolution from factory side
+    # 5. Company Admin confirms resolution from factory side with individual reason verdicts
     client_confirm_res = client.post(
         f"/api/visiting/{visit_id}/confirm-resolution/",
         data={
-            "client_is_resolved": True,
             "client_resolution_notes": "Factory test run passed with zero sensor drift.",
             "client_resolved_by": "Arafath",
+            "visit_reasons": [
+                {"id": "r-1", "client_is_resolved": True}
+            ],
         },
         headers={"x-user-role": "company_admin"},
         format="json"
     )
     assert client_confirm_res.status_code == 200
     assert client_confirm_res.json()["client_is_resolved"] is True
+    assert client_confirm_res.json()["visit_reasons"][0]["client_is_resolved"] is True
     assert "Factory test run" in client_confirm_res.json()["client_resolution_notes"]
 
     # 6. Test filtering by status, priority, and search query

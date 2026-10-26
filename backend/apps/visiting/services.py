@@ -60,6 +60,8 @@ def _normalize_reasons(raw_reasons) -> list:
             'id': reason.get('id') or f'reason-{index + 1}',
             'label': label,
             'option_id': option_id,
+            'is_resolved': reason.get('is_resolved') if reason.get('is_resolved') is not None else None,
+            'client_is_resolved': reason.get('client_is_resolved') if reason.get('client_is_resolved') is not None else None,
         })
     return normalized
 
@@ -282,10 +284,12 @@ class VisitingReportService:
         prechecklist_audit: list = None,
         is_flagged: bool = False,
         flag_reason: str = '',
-        is_resolved: bool = False,
+        is_resolved: bool = None,
         resolution_notes: str = '',
         host_name: str = '',
         host_phone: str = '',
+        visit_reasons: list = None,
+        internal_visit_reasons: list = None,
     ) -> VisitingReport:
         if user_role == 'company_admin':
             raise PermissionDenied("Only Solution Provider engineers (super_admin) can mark visiting reports completed.")
@@ -307,8 +311,48 @@ class VisitingReportService:
         report.flagged_at = timezone.now() if report.is_flagged else None
         report.flagged_by = (user_name or 'Field Engineer') if report.is_flagged else ''
 
-        # Final verdict on the reported problem, shared with both sides.
-        report.is_resolved = bool(is_resolved)
+        # Update individual visit_reasons resolution verdicts
+        if visit_reasons is not None:
+            updated_reasons = []
+            reason_map = {r.get('id'): r for r in visit_reasons if isinstance(r, dict)}
+            for r in (report.visit_reasons or []):
+                r_id = r.get('id')
+                input_r = reason_map.get(r_id)
+                if input_r is not None and 'is_resolved' in input_r:
+                    r['is_resolved'] = bool(input_r['is_resolved'])
+                updated_reasons.append(r)
+            if updated_reasons:
+                report.visit_reasons = updated_reasons
+
+        # Update individual internal_visit_reasons resolution verdicts
+        if internal_visit_reasons is not None:
+            updated_internal = []
+            internal_map = {r.get('id'): r for r in internal_visit_reasons if isinstance(r, dict)}
+            for r in (report.internal_visit_reasons or []):
+                r_id = r.get('id')
+                input_r = internal_map.get(r_id)
+                if input_r is not None and 'is_resolved' in input_r:
+                    r['is_resolved'] = bool(input_r['is_resolved'])
+                updated_internal.append(r)
+            if updated_internal:
+                report.internal_visit_reasons = updated_internal
+
+        # Determine overall is_resolved
+        all_verdicts = []
+        for r in (report.visit_reasons or []):
+            if isinstance(r, dict) and r.get('is_resolved') is not None:
+                all_verdicts.append(bool(r['is_resolved']))
+        for r in (report.internal_visit_reasons or []):
+            if isinstance(r, dict) and r.get('is_resolved') is not None:
+                all_verdicts.append(bool(r['is_resolved']))
+
+        if is_resolved is not None:
+            report.is_resolved = bool(is_resolved)
+        elif all_verdicts:
+            report.is_resolved = all(all_verdicts)
+        else:
+            report.is_resolved = False
+
         report.resolution_notes = (resolution_notes or '').strip()
         if host_name:
             report.host_name = host_name.strip()
@@ -337,13 +381,38 @@ class VisitingReportService:
     @staticmethod
     def confirm_client_resolution(
         report: VisitingReport,
-        client_is_resolved: bool,
-        client_resolution_notes: str,
-        user_name: str,
-        user_role: str,
+        client_is_resolved: bool = None,
+        client_resolution_notes: str = '',
+        user_name: str = '',
+        user_role: str = 'company_admin',
+        visit_reasons: list = None,
     ) -> VisitingReport:
-        """Company admin signs off on whether the visit solved the problem from their side."""
-        report.client_is_resolved = bool(client_is_resolved)
+        """Company admin signs off on whether each visit reason was solved from their side."""
+        if visit_reasons is not None:
+            updated_reasons = []
+            reason_map = {r.get('id'): r for r in visit_reasons if isinstance(r, dict)}
+            for r in (report.visit_reasons or []):
+                r_id = r.get('id')
+                input_r = reason_map.get(r_id)
+                if input_r is not None and 'client_is_resolved' in input_r:
+                    r['client_is_resolved'] = bool(input_r['client_is_resolved'])
+                updated_reasons.append(r)
+            if updated_reasons:
+                report.visit_reasons = updated_reasons
+
+        all_client_verdicts = [
+            bool(r['client_is_resolved'])
+            for r in (report.visit_reasons or [])
+            if isinstance(r, dict) and r.get('client_is_resolved') is not None
+        ]
+
+        if client_is_resolved is not None:
+            report.client_is_resolved = bool(client_is_resolved)
+        elif all_client_verdicts:
+            report.client_is_resolved = all(all_client_verdicts)
+        else:
+            report.client_is_resolved = False
+
         report.client_resolution_notes = (client_resolution_notes or '').strip()
         report.client_resolved_at = timezone.now()
         report.client_resolved_by = user_name or 'Company Admin'

@@ -75,12 +75,15 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [completeHostName, setCompleteHostName] = useState('');
   const [completeHostPhone, setCompleteHostPhone] = useState('');
+  const [completeReasonResolutions, setCompleteReasonResolutions] = useState<Record<string, boolean | null>>({});
+  const [completeInternalResolutions, setCompleteInternalResolutions] = useState<Record<string, boolean | null>>({});
   const [completionError, setCompletionError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
 
   // Client Resolution Confirmation modal state (Company Admin sign-off)
   const [clientConfirmVisit, setClientConfirmVisit] = useState<VisitingReport | null>(null);
   const [clientProblemSolved, setClientProblemSolved] = useState<boolean | null>(null);
+  const [clientReasonResolutions, setClientReasonResolutions] = useState<Record<string, boolean | null>>({});
   const [clientResolutionNotes, setClientResolutionNotes] = useState('');
   const [clientConfirmError, setClientConfirmError] = useState<string | null>(null);
   const [submittingClientConfirm, setSubmittingClientConfirm] = useState(false);
@@ -158,7 +161,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
     setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
   };
 
-  // Open Completion Modal and populate the audit and the resolution state
+  // Open Completion Modal and populate the audit, resolution, and individual reason states
   const handleOpenCompleteModal = (report: VisitingReport) => {
     setCompleteModalVisit(report);
     setCompletionError(null);
@@ -182,6 +185,37 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
     );
     setResolutionNotes(report.resolution_notes || '');
     setCompleteSummary(report.service_summary || '');
+
+    // Populate individual reason resolution states
+    const initPublic: Record<string, boolean | null> = {};
+    (report.visit_reasons || []).forEach((r, idx) => {
+      const key = r.id || `public-${idx}`;
+      initPublic[key] = typeof r.is_resolved === 'boolean' ? r.is_resolved : null;
+    });
+    setCompleteReasonResolutions(initPublic);
+
+    const initInternal: Record<string, boolean | null> = {};
+    (report.internal_visit_reasons || []).forEach((r, idx) => {
+      const key = r.id || `internal-${idx}`;
+      initInternal[key] = typeof r.is_resolved === 'boolean' ? r.is_resolved : null;
+    });
+    setCompleteInternalResolutions(initInternal);
+  };
+
+  const handleOpenClientConfirmModal = (report: VisitingReport) => {
+    setClientConfirmVisit(report);
+    setClientConfirmError(null);
+    setClientResolutionNotes(report.client_resolution_notes || '');
+    setClientProblemSolved(typeof report.client_is_resolved === 'boolean' ? report.client_is_resolved : null);
+
+    const initClient: Record<string, boolean | null> = {};
+    (report.visit_reasons || []).forEach((r, idx) => {
+      const key = r.id || `client-${idx}`;
+      initClient[key] = typeof r.client_is_resolved === 'boolean'
+        ? r.client_is_resolved
+        : (typeof r.is_resolved === 'boolean' ? r.is_resolved : null);
+    });
+    setClientReasonResolutions(initClient);
   };
 
   const toggleAuditFlag = (id: string | undefined) => {
@@ -201,7 +235,26 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
       setCompletionError(null);
       const flaggedItems = completionAudit.filter((item) => item.status === 'flagged');
 
-      if (problemSolved === null) {
+      const publicReasons = completeModalVisit.visit_reasons || [];
+      const internalReasons = completeModalVisit.internal_visit_reasons || [];
+      const hasReasons = publicReasons.length > 0 || internalReasons.length > 0;
+
+      if (hasReasons) {
+        const unselectedPublic = publicReasons.some(
+          (r, idx) =>
+            completeReasonResolutions[r.id || `public-${idx}`] === null ||
+            completeReasonResolutions[r.id || `public-${idx}`] === undefined
+        );
+        const unselectedInternal = internalReasons.some(
+          (r, idx) =>
+            completeInternalResolutions[r.id || `internal-${idx}`] === null ||
+            completeInternalResolutions[r.id || `internal-${idx}`] === undefined
+        );
+        if (unselectedPublic || unselectedInternal) {
+          setCompletionError('Please select whether each visit reason was solved or not.');
+          return;
+        }
+      } else if (problemSolved === null) {
         setCompletionError('Confirm whether the visit solved the problem.');
         return;
       }
@@ -211,6 +264,29 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
         return;
       }
 
+      let resolvedFlag: boolean;
+      if (hasReasons) {
+        const allPublicSolved = publicReasons.every(
+          (r, idx) => completeReasonResolutions[r.id || `public-${idx}`] === true
+        );
+        const allInternalSolved = internalReasons.every(
+          (r, idx) => completeInternalResolutions[r.id || `internal-${idx}`] === true
+        );
+        resolvedFlag = allPublicSolved && allInternalSolved;
+      } else {
+        resolvedFlag = problemSolved === true;
+      }
+
+      const updatedVisitReasons = publicReasons.map((r, idx) => ({
+        ...r,
+        is_resolved: completeReasonResolutions[r.id || `public-${idx}`] ?? false
+      }));
+
+      const updatedInternalReasons = internalReasons.map((r, idx) => ({
+        ...r,
+        is_resolved: completeInternalResolutions[r.id || `internal-${idx}`] ?? false
+      }));
+
       setCompleting(true);
       const updated = await api.completeVisit(completeModalVisit.id, {
         service_summary: completeSummary.trim(),
@@ -219,10 +295,12 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
         prechecklist_audit: completionAudit,
         is_flagged: flaggedItems.length > 0,
         flag_reason: flagReason.trim(),
-        is_resolved: problemSolved,
+        is_resolved: resolvedFlag,
         resolution_notes: resolutionNotes.trim(),
         host_name: completeHostName.trim(),
-        host_phone: completeHostPhone.trim()
+        host_phone: completeHostPhone.trim(),
+        visit_reasons: updatedVisitReasons,
+        internal_visit_reasons: updatedInternalReasons
       });
       setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       setCompleteModalVisit(null);
@@ -232,6 +310,8 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
       setResolutionNotes('');
       setCompleteHostName('');
       setCompleteHostPhone('');
+      setCompleteReasonResolutions({});
+      setCompleteInternalResolutions({});
     } catch (err: any) {
       setCompletionError(err.message || 'Failed to complete visit');
     } finally {
@@ -241,26 +321,57 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
 
   const handleClientConfirmSubmit = async () => {
     if (!clientConfirmVisit) return;
-    if (clientProblemSolved === null) {
+    const publicReasons = clientConfirmVisit.visit_reasons || [];
+    const hasReasons = publicReasons.length > 0;
+
+    if (hasReasons) {
+      const unselected = publicReasons.some(
+        (r, idx) =>
+          clientReasonResolutions[r.id || `client-${idx}`] === null ||
+          clientReasonResolutions[r.id || `client-${idx}`] === undefined
+      );
+      if (unselected) {
+        setClientConfirmError('Please confirm whether each visit reason was solved or not.');
+        return;
+      }
+    } else if (clientProblemSolved === null) {
       setClientConfirmError('Confirm whether the problem is solved.');
       return;
     }
+
     try {
       setSubmittingClientConfirm(true);
       setClientConfirmError(null);
+
+      let resolvedFlag: boolean;
+      if (hasReasons) {
+        resolvedFlag = publicReasons.every(
+          (r, idx) => clientReasonResolutions[r.id || `client-${idx}`] === true
+        );
+      } else {
+        resolvedFlag = clientProblemSolved === true;
+      }
+
+      const updatedVisitReasons = publicReasons.map((r, idx) => ({
+        ...r,
+        client_is_resolved: clientReasonResolutions[r.id || `client-${idx}`] ?? false
+      }));
+
       const updated = await api.confirmClientResolution(
         clientConfirmVisit.id,
         {
-          client_is_resolved: clientProblemSolved,
+          client_is_resolved: resolvedFlag,
           client_resolution_notes: clientResolutionNotes.trim(),
           client_resolved_by: currentUser.name,
-          user_role: currentUser.role
+          user_role: currentUser.role,
+          visit_reasons: updatedVisitReasons
         }
       );
       setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       setClientConfirmVisit(null);
       setClientProblemSolved(null);
       setClientResolutionNotes('');
+      setClientReasonResolutions({});
     } catch (err: any) {
       setClientConfirmError(err.message || 'Failed to submit resolution confirmation');
     } finally {
@@ -542,15 +653,32 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
 
                         {visitReasons.length > 0 ? (
                           <div className="space-y-1 pt-0.5">
-                            {visitReasons.map((reason, idx) => (
-                              <div
-                                key={reason.id || idx}
-                                className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-tight"
-                              >
-                                <span className="mt-0.5 shrink-0 text-indigo-500">•</span>
-                                <span className="break-words leading-tight">{reason.label}</span>
-                              </div>
-                            ))}
+                            {visitReasons.map((reason, idx) => {
+                              const isResolved =
+                                typeof reason.is_resolved === 'boolean'
+                                  ? reason.is_resolved
+                                  : (report.status === 'Completed' && typeof report.is_resolved === 'boolean'
+                                      ? report.is_resolved
+                                      : null);
+                              return (
+                                <div
+                                  key={reason.id || idx}
+                                  className="text-[11px] text-slate-700 flex items-start gap-1.5 leading-tight"
+                                >
+                                  <span className="font-semibold text-slate-500 shrink-0">{idx + 1}.</span>
+                                  <span className="break-words flex-1 leading-tight">{reason.label}</span>
+                                  {report.status === 'Completed' && typeof isResolved === 'boolean' && (
+                                    <span
+                                      className={`text-[10px] font-semibold shrink-0 ${
+                                        isResolved ? 'text-emerald-600' : 'text-amber-600'
+                                      }`}
+                                    >
+                                      ({isResolved ? 'solved' : 'not solved'})
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
                           <p className="text-[11px] text-slate-500 line-clamp-2">
@@ -559,8 +687,8 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                         )}
                       </div>
 
-                      {/* Welcoming person on the factory side */}
-                      {report.host_name && (
+                      {/* Welcoming person on the factory side (Super Admin only) */}
+                      {isSuperAdmin && report.host_name && (
                         <div className="mt-2 p-2 bg-slate-50 border border-slate-200/80 rounded-lg flex items-center gap-1.5 flex-wrap text-[11px] text-slate-700">
                           <User size={12} className="text-indigo-600 shrink-0" />
                           <span className="text-slate-500 font-medium">Welcoming Person:</span>
@@ -648,12 +776,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                               {isCompanyAdmin && (
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setClientConfirmVisit(report);
-                                    setClientProblemSolved(null);
-                                    setClientResolutionNotes('');
-                                    setClientConfirmError(null);
-                                  }}
+                                  onClick={() => handleOpenClientConfirmModal(report)}
                                   className="text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer"
                                 >
                                   Sign off
@@ -674,12 +797,29 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                             </span>
                             <span className="text-purple-600">{internalReasons.length}</span>
                           </div>
-                          {internalReasons.map((reason, idx) => (
-                            <div key={reason.id || idx} className="text-[10px] text-purple-900 flex items-start gap-1.5 leading-tight">
-                              <span className="mt-0.5 shrink-0 text-purple-400">•</span>
-                              <span className="break-words">{reason.label}</span>
-                            </div>
-                          ))}
+                          {internalReasons.map((reason, idx) => {
+                            const isResolved =
+                              typeof reason.is_resolved === 'boolean'
+                                ? reason.is_resolved
+                                : (report.status === 'Completed' && typeof report.is_resolved === 'boolean'
+                                    ? report.is_resolved
+                                    : null);
+                            return (
+                              <div key={reason.id || idx} className="text-[10px] text-purple-900 flex items-start gap-1.5 leading-tight">
+                                <span className="font-semibold text-purple-400 shrink-0">{idx + 1}.</span>
+                                <span className="break-words flex-1 leading-tight">{reason.label}</span>
+                                {report.status === 'Completed' && typeof isResolved === 'boolean' && (
+                                  <span
+                                    className={`text-[9px] font-semibold shrink-0 ${
+                                      isResolved ? 'text-emerald-700' : 'text-amber-700'
+                                    }`}
+                                  >
+                                    ({isResolved ? 'solved' : 'not solved'})
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -743,12 +883,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                       {isCompanyAdmin && report.status === 'Completed' && typeof report.client_is_resolved !== 'boolean' && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setClientConfirmVisit(report);
-                            setClientProblemSolved(null);
-                            setClientResolutionNotes('');
-                            setClientConfirmError(null);
-                          }}
+                          onClick={() => handleOpenClientConfirmModal(report)}
                           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-sm transition-all flex items-center gap-1.5"
                         >
                           <CheckCircle2 size={14} />
@@ -868,7 +1003,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                               {leadPhone}
                             </a>
                           )}
-                          {report.host_name && (
+                          {isSuperAdmin && report.host_name && (
                             <div className="text-[10px] text-slate-500 mt-0.5">
                               Welcoming: <strong className="text-slate-700">{report.host_name}</strong>
                               {report.host_phone ? ` · ${report.host_phone}` : ''}
@@ -891,12 +1026,29 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                                   <div className="text-[9px] font-bold uppercase tracking-wide text-indigo-700">
                                     Reason for Visit
                                   </div>
-                                  {visitReasons.map((reason, idx) => (
-                                    <div key={reason.id || idx} className="flex items-start gap-1.5 leading-tight">
-                                      <span className="mt-0.5 shrink-0 text-indigo-500">•</span>
-                                      <span className="break-words">{reason.label}</span>
-                                    </div>
-                                  ))}
+                                  {visitReasons.map((reason, idx) => {
+                                    const isResolved =
+                                      typeof reason.is_resolved === 'boolean'
+                                        ? reason.is_resolved
+                                        : (report.status === 'Completed' && typeof report.is_resolved === 'boolean'
+                                            ? report.is_resolved
+                                            : null);
+                                    return (
+                                      <div key={reason.id || idx} className="flex items-start gap-1.5 leading-tight">
+                                        <span className="font-semibold text-slate-500 shrink-0">{idx + 1}.</span>
+                                        <span className="break-words flex-1">{reason.label}</span>
+                                        {report.status === 'Completed' && typeof isResolved === 'boolean' && (
+                                          <span
+                                            className={`text-[10px] font-semibold shrink-0 ${
+                                              isResolved ? 'text-emerald-600' : 'text-amber-600'
+                                            }`}
+                                          >
+                                            ({isResolved ? 'solved' : 'not solved'})
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
 
                                   {isSuperAdmin && internalReasons.length > 0 && (
                                     <div className="mt-1.5 pt-1.5 border-t border-purple-200 space-y-1">
@@ -904,12 +1056,29 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                                         <Lock size={9} />
                                         Confidential Reason
                                       </div>
-                                      {internalReasons.map((reason, idx) => (
-                                        <div key={reason.id || idx} className="flex items-start gap-1.5 leading-tight text-purple-900">
-                                          <span className="mt-0.5 shrink-0 text-purple-400">•</span>
-                                          <span className="break-words">{reason.label}</span>
-                                        </div>
-                                      ))}
+                                      {internalReasons.map((reason, idx) => {
+                                        const isResolved =
+                                          typeof reason.is_resolved === 'boolean'
+                                            ? reason.is_resolved
+                                            : (report.status === 'Completed' && typeof report.is_resolved === 'boolean'
+                                                ? report.is_resolved
+                                                : null);
+                                        return (
+                                          <div key={reason.id || idx} className="flex items-start gap-1.5 leading-tight text-purple-900">
+                                            <span className="font-semibold text-purple-400 shrink-0">{idx + 1}.</span>
+                                            <span className="break-words flex-1">{reason.label}</span>
+                                            {report.status === 'Completed' && typeof isResolved === 'boolean' && (
+                                              <span
+                                                className={`text-[9px] font-semibold shrink-0 ${
+                                                  isResolved ? 'text-emerald-700' : 'text-amber-700'
+                                                }`}
+                                              >
+                                                ({isResolved ? 'solved' : 'not solved'})
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   )}
 
@@ -1001,12 +1170,7 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                           {isCompanyAdmin && report.status === 'Completed' && typeof report.client_is_resolved !== 'boolean' && (
                             <button
                               type="button"
-                              onClick={() => {
-                                setClientConfirmVisit(report);
-                                setClientProblemSolved(null);
-                                setClientResolutionNotes('');
-                                setClientConfirmError(null);
-                              }}
+                              onClick={() => handleOpenClientConfirmModal(report)}
                               className="px-3 py-1 rounded-md text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xs"
                             >
                               Confirm
@@ -1197,40 +1361,134 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 </div>
               </div>
 
-              {/* Reason for Visit (Client-facing) */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                  <ListTodo size={13} className="text-indigo-600" />
-                  <span>Reason for Visit</span>
-                </label>
+              {/* Reason for Visit (Company owner part) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <ListTodo size={13} className="text-indigo-600" />
+                    <span>Reason for Visit</span>
+                  </label>
+                  {(completeModalVisit.visit_reasons || []).length > 0 && (
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {(completeModalVisit.visit_reasons || []).length} items
+                    </span>
+                  )}
+                </div>
                 {(completeModalVisit.visit_reasons || []).length > 0 ? (
-                  <div className="space-y-1">
-                    {(completeModalVisit.visit_reasons || []).map((reason, idx) => (
-                      <div key={reason.id || idx} className="text-[11px] text-slate-700 flex items-start gap-1.5">
-                        <span className="mt-0.5 shrink-0 text-indigo-500">•</span>
-                        <span className="break-words">{reason.label}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    {(completeModalVisit.visit_reasons || []).map((reason, idx) => {
+                      const key = reason.id || `public-${idx}`;
+                      const status = completeReasonResolutions[key];
+                      return (
+                        <div
+                          key={key}
+                          className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 shadow-xs"
+                        >
+                          <div className="flex items-start gap-2 min-w-0 flex-1">
+                            <span className="font-bold text-xs text-slate-500 shrink-0 mt-0.5">{idx + 1}.</span>
+                            <span className="text-xs font-medium text-slate-800 break-words leading-relaxed">{reason.label}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCompleteReasonResolutions((prev) => ({ ...prev, [key]: true }));
+                                setCompletionError(null);
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${
+                                status === true
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                  : 'bg-slate-50 text-emerald-700 border-slate-200 hover:bg-emerald-50'
+                              }`}
+                            >
+                              <CheckCircle2 size={12} />
+                              <span>Solved</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCompleteReasonResolutions((prev) => ({ ...prev, [key]: false }));
+                                setCompletionError(null);
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${
+                                status === false
+                                  ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                                  : 'bg-slate-50 text-amber-700 border-slate-200 hover:bg-amber-50'
+                              }`}
+                            >
+                              <XCircle size={12} />
+                              <span>Not Solved</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-[11px] text-slate-600">{completeModalVisit.purpose}</p>
                 )}
               </div>
 
-              {/* Confidential reason for the visit (provider only) */}
+              {/* Confidential reason for the visit (Super Admin confidential part) */}
               {(completeModalVisit.internal_visit_reasons || []).length > 0 && (
-                <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-3.5 space-y-2">
-                  <label className="text-xs font-bold text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
-                    <Lock size={13} className="text-purple-600" />
-                    <span>Confidential Reason for Visit</span>
-                  </label>
-                  <div className="space-y-1">
-                    {(completeModalVisit.internal_visit_reasons || []).map((reason, idx) => (
-                      <div key={reason.id || idx} className="text-[11px] text-purple-900 flex items-start gap-1.5">
-                        <span className="mt-0.5 shrink-0 text-purple-400">•</span>
-                        <span className="break-words">{reason.label}</span>
-                      </div>
-                    ))}
+                <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                      <Lock size={13} className="text-purple-600" />
+                      <span>Confidential Reason for Visit</span>
+                    </label>
+                    <span className="text-[11px] text-purple-700 font-medium">
+                      {(completeModalVisit.internal_visit_reasons || []).length} items
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {(completeModalVisit.internal_visit_reasons || []).map((reason, idx) => {
+                      const key = reason.id || `internal-${idx}`;
+                      const status = completeInternalResolutions[key];
+                      return (
+                        <div
+                          key={key}
+                          className="p-2.5 bg-white border border-purple-200 rounded-xl flex items-center justify-between gap-3 shadow-xs"
+                        >
+                          <div className="flex items-start gap-2 min-w-0 flex-1">
+                            <span className="font-bold text-xs text-purple-400 shrink-0 mt-0.5">{idx + 1}.</span>
+                            <span className="text-xs font-medium text-purple-950 break-words leading-relaxed">{reason.label}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCompleteInternalResolutions((prev) => ({ ...prev, [key]: true }));
+                                setCompletionError(null);
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${
+                                status === true
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                  : 'bg-purple-50/50 text-emerald-700 border-purple-200 hover:bg-emerald-50'
+                              }`}
+                            >
+                              <CheckCircle2 size={12} />
+                              <span>Solved</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCompleteInternalResolutions((prev) => ({ ...prev, [key]: false }));
+                                setCompletionError(null);
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${
+                                status === false
+                                  ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                                  : 'bg-purple-50/50 text-amber-700 border-purple-200 hover:bg-amber-50'
+                              }`}
+                            >
+                              <XCircle size={12} />
+                              <span>Not Solved</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1312,48 +1570,43 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 </div>
               </div>
 
-              {/* Final confirmation: was the reported problem solved by this visit? */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                  {problemSolved === false ? (
-                    <XCircle size={14} className="text-amber-600" />
-                  ) : (
-                    <CheckCircle2 size={14} className="text-emerald-600" />
-                  )}
-                  <span>Problem Solved?</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProblemSolved(true);
-                      setCompletionError(null);
-                    }}
-                    className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
-                      problemSolved === true
-                        ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
-                    }`}
-                  >
-                    <CheckCircle2 size={14} />
-                    <span>Yes, Solved</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProblemSolved(false);
-                      setCompletionError(null);
-                    }}
-                    className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
-                      problemSolved === false
-                        ? 'bg-amber-600 text-white border-amber-600'
-                        : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
-                    }`}
-                  >
-                    <XCircle size={14} />
-                    <span>No, Not Solved</span>
-                  </button>
-                </div>
+              {/* Resolution Remarks */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Resolution Remarks</label>
+                {(completeModalVisit.visit_reasons || []).length === 0 && (completeModalVisit.internal_visit_reasons || []).length === 0 && (
+                  <div className="grid grid-cols-2 gap-2 pb-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProblemSolved(true);
+                        setCompletionError(null);
+                      }}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
+                        problemSolved === true
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                      }`}
+                    >
+                      <CheckCircle2 size={14} />
+                      <span>Yes, Solved</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProblemSolved(false);
+                        setCompletionError(null);
+                      }}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
+                        problemSolved === false
+                          ? 'bg-amber-600 text-white border-amber-600'
+                          : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
+                      }`}
+                    >
+                      <XCircle size={14} />
+                      <span>No, Not Solved</span>
+                    </button>
+                  </div>
+                )}
                 <textarea
                   rows={2}
                   value={resolutionNotes}
@@ -1436,32 +1689,93 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 </div>
               )}
 
-              {/* Welcoming person if present */}
-              {clientConfirmVisit.host_name && (
-                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-2 text-xs text-slate-700">
-                  <User size={13} className="text-indigo-600 shrink-0" />
-                  <span className="text-slate-500 font-medium">Welcoming Person:</span>
-                  <span className="font-semibold text-slate-900">{clientConfirmVisit.host_name}</span>
-                  {clientConfirmVisit.host_phone && (
-                    <span className="text-slate-500">• {clientConfirmVisit.host_phone}</span>
+              {/* Reason for Visit with Provider Verdict & Client Confirmation */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <ListTodo size={13} className="text-indigo-600" />
+                    <span>Reason for Visit</span>
+                  </label>
+                  {(clientConfirmVisit.visit_reasons || []).length > 0 && (
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {(clientConfirmVisit.visit_reasons || []).length} items
+                    </span>
                   )}
                 </div>
-              )}
 
-              {/* Reason for Visit */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                  <ListTodo size={13} className="text-indigo-600" />
-                  <span>Reason for Visit</span>
-                </label>
                 {(clientConfirmVisit.visit_reasons || []).length > 0 ? (
-                  <div className="space-y-1 pt-1">
-                    {(clientConfirmVisit.visit_reasons || []).map((reason, idx) => (
-                      <div key={reason.id || idx} className="text-[11px] text-slate-700 flex items-start gap-1.5 leading-tight">
-                        <span className="mt-0.5 shrink-0 text-indigo-500">•</span>
-                        <span className="break-words">{reason.label}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    {(clientConfirmVisit.visit_reasons || []).map((reason, idx) => {
+                      const key = reason.id || `client-${idx}`;
+                      const clientStatus = clientReasonResolutions[key];
+                      const isProviderResolved =
+                        typeof reason.is_resolved === 'boolean'
+                          ? reason.is_resolved
+                          : (typeof clientConfirmVisit.is_resolved === 'boolean'
+                              ? clientConfirmVisit.is_resolved
+                              : null);
+                      return (
+                        <div
+                          key={key}
+                          className="p-3 bg-white border border-slate-200 rounded-xl space-y-2 shadow-xs"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2 flex-1 min-w-0">
+                              <span className="font-bold text-xs text-slate-500 shrink-0 mt-0.5">{idx + 1}.</span>
+                              <span className="text-xs font-medium text-slate-800 break-words leading-relaxed">{reason.label}</span>
+                            </div>
+                            {typeof isProviderResolved === 'boolean' && (
+                              <span
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
+                                  isProviderResolved
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}
+                              >
+                                {isProviderResolved ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                                <span>Provider: {isProviderResolved ? 'Solved' : 'Not Solved'}</span>
+                              </span>
+                            )}
+                          </div>
+                          {/* Client decision per item */}
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-semibold text-slate-600">Your Confirmation:</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setClientReasonResolutions((prev) => ({ ...prev, [key]: true }));
+                                  setClientConfirmError(null);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${
+                                  clientStatus === true
+                                    ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
+                                    : 'bg-slate-50 text-teal-700 border-slate-200 hover:bg-teal-50'
+                                }`}
+                              >
+                                <CheckCircle2 size={12} />
+                                <span>Solved</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setClientReasonResolutions((prev) => ({ ...prev, [key]: false }));
+                                  setClientConfirmError(null);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${
+                                  clientStatus === false
+                                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                                    : 'bg-slate-50 text-rose-700 border-slate-200 hover:bg-rose-50'
+                                }`}
+                              >
+                                <XCircle size={12} />
+                                <span>Not Solved</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-[11px] text-slate-600">{clientConfirmVisit.purpose}</p>
@@ -1500,49 +1814,51 @@ export const VisitingReports: React.FC<VisitingReportsProps> = ({ currentUser })
                 </div>
               )}
 
-              {/* Client Verdict: Problem Solved? */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                  {clientProblemSolved === false ? (
-                    <XCircle size={14} className="text-rose-600" />
-                  ) : (
-                    <CheckCircle2 size={14} className="text-teal-600" />
-                  )}
-                  <span>Problem Solved?</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setClientProblemSolved(true);
-                      setClientConfirmError(null);
-                    }}
-                    className={`px-3 py-2.5 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
-                      clientProblemSolved === true
-                        ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
-                        : 'bg-white text-teal-700 border-teal-200 hover:bg-teal-50'
-                    }`}
-                  >
-                    <CheckCircle2 size={14} />
-                    <span>Yes, Solved</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setClientProblemSolved(false);
-                      setClientConfirmError(null);
-                    }}
-                    className={`px-3 py-2.5 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
-                      clientProblemSolved === false
-                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
-                        : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
-                    }`}
-                  >
-                    <XCircle size={14} />
-                    <span>No, Not Solved</span>
-                  </button>
+              {/* Fallback Client Verdict if no visit reasons configured */}
+              {(clientConfirmVisit.visit_reasons || []).length === 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                    {clientProblemSolved === false ? (
+                      <XCircle size={14} className="text-rose-600" />
+                    ) : (
+                      <CheckCircle2 size={14} className="text-teal-600" />
+                    )}
+                    <span>Problem Solved?</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClientProblemSolved(true);
+                        setClientConfirmError(null);
+                      }}
+                      className={`px-3 py-2.5 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
+                        clientProblemSolved === true
+                          ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                          : 'bg-white text-teal-700 border-teal-200 hover:bg-teal-50'
+                      }`}
+                    >
+                      <CheckCircle2 size={14} />
+                      <span>Yes, Solved</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClientProblemSolved(false);
+                        setClientConfirmError(null);
+                      }}
+                      className={`px-3 py-2.5 rounded-lg text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5 ${
+                        clientProblemSolved === false
+                          ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                          : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
+                      }`}
+                    >
+                      <XCircle size={14} />
+                      <span>No, Not Solved</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Client Remarks */}
               <div className="space-y-1.5">

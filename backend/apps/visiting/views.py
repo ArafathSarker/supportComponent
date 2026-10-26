@@ -131,10 +131,12 @@ class VisitingReportCompleteView(APIView):
             prechecklist_audit=serializer.validated_data.get('prechecklist_audit', []),
             is_flagged=serializer.validated_data.get('is_flagged', False),
             flag_reason=serializer.validated_data.get('flag_reason', ''),
-            is_resolved=serializer.validated_data['is_resolved'],
+            is_resolved=serializer.validated_data.get('is_resolved'),
             resolution_notes=serializer.validated_data.get('resolution_notes', ''),
             host_name=serializer.validated_data.get('host_name', ''),
             host_phone=serializer.validated_data.get('host_phone', ''),
+            visit_reasons=serializer.validated_data.get('visit_reasons'),
+            internal_visit_reasons=serializer.validated_data.get('internal_visit_reasons'),
         )
         return Response(
             VisitingReportSerializer(completed_report, context={'role': user_role}).data,
@@ -158,10 +160,11 @@ class VisitingReportClientConfirmView(APIView):
 
         updated_report = VisitingReportService.confirm_client_resolution(
             report=report,
-            client_is_resolved=serializer.validated_data['client_is_resolved'],
+            client_is_resolved=serializer.validated_data.get('client_is_resolved'),
             client_resolution_notes=serializer.validated_data.get('client_resolution_notes', ''),
             user_name=user_name,
             user_role=user_role,
+            visit_reasons=serializer.validated_data.get('visit_reasons'),
         )
         return Response(
             VisitingReportSerializer(updated_report, context={'role': user_role}).data,

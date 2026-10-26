@@ -548,8 +548,6 @@ export class SupportApiClient {
     visiting_team_names?: string;
     visiting_team_members?: VisitingTeamMember[];
     total_visitors?: number;
-    host_name?: string;
-    host_phone?: string;
     visit_reasons?: import('./types').VisitReason[];
     internal_visit_reasons?: import('./types').VisitReason[];
     show_visitor_count?: boolean;
@@ -582,7 +580,7 @@ export class SupportApiClient {
     visitId: string,
     payload: {
       acknowledgedBy: string;
-      hostName: string;
+      hostName?: string;
       hostPhone?: string;
       notes?: string;
       userRole?: string;
@@ -599,7 +597,7 @@ export class SupportApiClient {
       body: JSON.stringify({
         acknowledged_by: payload.acknowledgedBy,
         company_acknowledgement_notes: payload.notes || '',
-        host_name: payload.hostName,
+        host_name: payload.hostName || '',
         host_phone: payload.hostPhone || '',
       }),
     });
@@ -619,10 +617,12 @@ export class SupportApiClient {
       prechecklist_audit?: import('./types').PrechecklistAuditItem[];
       is_flagged?: boolean;
       flag_reason?: string;
-      is_resolved: boolean;
+      is_resolved?: boolean;
       resolution_notes?: string;
       host_name?: string;
       host_phone?: string;
+      visit_reasons?: import('./types').VisitReason[];
+      internal_visit_reasons?: import('./types').VisitReason[];
     }
   ): Promise<VisitingReport> {
     const res = await fetch(`${this.apiBase}/visiting/${visitId}/complete/`, {
@@ -642,6 +642,8 @@ export class SupportApiClient {
         resolution_notes: payload.resolution_notes || '',
         host_name: payload.host_name || '',
         host_phone: payload.host_phone || '',
+        visit_reasons: payload.visit_reasons || [],
+        internal_visit_reasons: payload.internal_visit_reasons || [],
       }),
     });
     if (!res.ok) {
@@ -654,10 +656,11 @@ export class SupportApiClient {
   async confirmClientResolution(
     visitId: string,
     payload: {
-      client_is_resolved: boolean;
+      client_is_resolved?: boolean;
       client_resolution_notes?: string;
       client_resolved_by?: string;
       user_role?: string;
+      visit_reasons?: import('./types').VisitReason[];
     }
   ): Promise<VisitingReport> {
     const userRole = payload.user_role || 'company_admin';
@@ -672,6 +675,7 @@ export class SupportApiClient {
         client_is_resolved: payload.client_is_resolved,
         client_resolution_notes: payload.client_resolution_notes || '',
         client_resolved_by: payload.client_resolved_by || '',
+        visit_reasons: payload.visit_reasons || [],
       }),
     });
     if (!res.ok) {

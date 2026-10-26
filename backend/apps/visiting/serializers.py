@@ -161,8 +161,6 @@ class VisitingReportCreateSerializer(serializers.Serializer):
         child=serializers.DictField(), required=False, default=list
     )
     total_visitors = serializers.IntegerField(required=False, default=1)
-    host_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
-    host_phone = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
     visit_reasons = serializers.ListField(child=serializers.DictField(), required=False, default=list)
     internal_visit_reasons = serializers.ListField(
         child=serializers.DictField(), required=False, default=list
@@ -198,8 +196,8 @@ class VisitingReportCompleteSerializer(serializers.Serializer):
     Validation schema for completing a field visit report (Solution Provider).
 
     Flags only: a pre-ticket check is either flagged (claimed by the company but
-    not actually done) or left clean. `is_resolved` records the final verdict on
-    whether the visit solved the reported problem.
+    not actually done) or left clean. Individual options indicate whether each visit reason
+    (company and confidential) is solved or not.
     """
     service_summary = serializers.CharField(required=False, allow_blank=True, default="")
     prechecklist_audit = serializers.ListField(
@@ -207,19 +205,43 @@ class VisitingReportCompleteSerializer(serializers.Serializer):
     )
     is_flagged = serializers.BooleanField(required=False, default=False)
     flag_reason = serializers.CharField(required=False, allow_blank=True, default="")
-    is_resolved = serializers.BooleanField()
+    is_resolved = serializers.BooleanField(required=False, default=None, allow_null=True)
     resolution_notes = serializers.CharField(required=False, allow_blank=True, default="")
     host_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
     host_phone = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    visit_reasons = serializers.ListField(
+        child=serializers.DictField(), required=False, default=list
+    )
+    internal_visit_reasons = serializers.ListField(
+        child=serializers.DictField(), required=False, default=list
+    )
+
+    def validate(self, attrs):
+        is_resolved = attrs.get('is_resolved')
+        visit_reasons = attrs.get('visit_reasons') or []
+        internal_reasons = attrs.get('internal_visit_reasons') or []
+        has_reason_verdict = any(
+            isinstance(r, dict) and r.get('is_resolved') is not None
+            for r in (visit_reasons + internal_reasons)
+        )
+        if is_resolved is None and not has_reason_verdict:
+            raise serializers.ValidationError({
+                'is_resolved': 'Confirm whether the visit solved the problem.'
+            })
+        return attrs
 
 
 class VisitingReportClientConfirmSerializer(serializers.Serializer):
     """
     Validation schema for company admin confirmation of resolution.
+    Individual options indicate whether each visit reason is solved or not on the client side.
     """
-    client_is_resolved = serializers.BooleanField()
+    client_is_resolved = serializers.BooleanField(required=False, default=None, allow_null=True)
     client_resolution_notes = serializers.CharField(required=False, allow_blank=True, default="")
     client_resolved_by = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    visit_reasons = serializers.ListField(
+        child=serializers.DictField(), required=False, default=list
+    )
 
 
 class VisitingReportUpdateSerializer(serializers.Serializer):

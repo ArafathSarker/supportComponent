@@ -50,8 +50,6 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
   const [priority, setPriority] = useState('High');
   const [floorLocation, setFloorLocation] = useState(GARMENTS_FLOORS[1]);
   const [lineNumber, setLineNumber] = useState('Sewing Line 04');
-  const [hostName, setHostName] = useState('');
-  const [hostPhone, setHostPhone] = useState('');
 
   // Managed employee directory
   const [employees, setEmployees] = useState<SupportEmployee[]>([]);
@@ -227,8 +225,6 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
         })),
         visiting_team_names: teamMembers.map((member) => member.name).join(', '),
         total_visitors: totalVisitorsCount,
-        host_name: hostName.trim(),
-        host_phone: hostPhone.trim(),
         visiting_engineers: [leadEngineer, ...teamMembers.map((member) => member.name)]
           .filter(Boolean)
           .join(', '),
@@ -350,28 +346,6 @@ export const ScheduleVisitModal: React.FC<ScheduleVisitModalProps> = ({
                 type="text"
                 value={lineNumber}
                 onChange={(e) => setLineNumber(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
-              />
-            </div>
-          </div>
-
-          {/* Welcoming Person on Factory Side */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Welcoming Person</label>
-              <input
-                type="text"
-                value={hostName}
-                onChange={(e) => setHostName(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Welcoming Person Phone</label>
-              <input
-                type="tel"
-                value={hostPhone}
-                onChange={(e) => setHostPhone(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-indigo-500 shadow-sm"
               />
             </div>

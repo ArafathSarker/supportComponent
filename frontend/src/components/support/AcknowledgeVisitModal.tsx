@@ -30,8 +30,6 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
   onVisitAcknowledged
 }) => {
   const [acknowledgedBy, setAcknowledgedBy] = useState(currentUser.name || '');
-  const [hostName, setHostName] = useState('');
-  const [hostPhone, setHostPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,18 +48,12 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hostName.trim()) {
-      setError('Add the welcoming person on the factory side.');
-      return;
-    }
     try {
       setSubmitting(true);
       setError(null);
 
       const updated = await api.acknowledgeVisit(visit.id, {
         acknowledgedBy: acknowledgedBy.trim() || currentUser.name,
-        hostName: hostName.trim(),
-        hostPhone: hostPhone.trim(),
         notes,
         userRole: currentUser.role || 'company_admin',
       });
@@ -211,36 +203,6 @@ export const AcknowledgeVisitModal: React.FC<AcknowledgeVisitModalProps> = ({
                   </div>
                 ))
               )}
-            </div>
-          </div>
-
-          {/* Welcoming person on the factory side */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                <span>Welcoming Person</span>
-                <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={hostName}
-                onChange={(e) => {
-                  setHostName(e.target.value);
-                  setError(null);
-                }}
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3.5 py-2 text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-sm"
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Welcoming Person Phone</label>
-              <input
-                type="tel"
-                value={hostPhone}
-                onChange={(e) => setHostPhone(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-3.5 py-2 text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-sm"
-              />
             </div>
           </div>
 
